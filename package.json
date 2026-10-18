@@ -1,0 +1,93 @@
+{
+  "name": "cp-pilot",
+  "displayName": "CP Pilot",
+  "description": "Competitive programming in VS Code: import problems from any judge via Competitive Companion, run tests locally, and get first-class CSES support.",
+  "version": "0.0.1",
+  "publisher": "harshraj",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HarshRaj797864/cp-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HarshRaj797864/cp-pilot/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "competitive programming",
+    "cses",
+    "codeforces",
+    "atcoder",
+    "competitive companion",
+    "cph",
+    "test cases"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cpPilot.restartListener",
+        "title": "Restart Competitive Companion Listener",
+        "category": "CP Pilot"
+      }
+    ],
+    "configuration": {
+      "title": "CP Pilot",
+      "properties": {
+        "cpPilot.companionPort": {
+          "type": "number",
+          "default": 27121,
+          "minimum": 1,
+          "maximum": 65535,
+          "markdownDescription": "Port to receive problems from the [Competitive Companion](https://github.com/jmerle/competitive-companion) browser extension. `27121` works out of the box. If CPH is also installed, pick another port (e.g. `27122`) and add it under *Custom ports* in Competitive Companion's settings."
+        },
+        "cpPilot.defaultLanguage": {
+          "type": "string",
+          "default": "cpp",
+          "enum": [
+            "cpp",
+            "c",
+            "python",
+            "java",
+            "rust",
+            "go",
+            "js"
+          ],
+          "description": "Language used for the solution file created when a problem is imported."
+        },
+        "cpPilot.templateFile": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a template file whose contents are copied into newly created solution files."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run check-types && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "vsix": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "~1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
