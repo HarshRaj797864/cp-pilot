@@ -40,21 +40,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.commands.registerCommand('cpPilot.runTests', () => judge.runTests()),
     vscode.commands.registerCommand('cpPilot.stopTests', () => judge.stop()),
-    vscode.commands.registerCommand('cpPilot.restartListener', startListener),
+    vscode.commands.registerCommand('cpPilot.restartListener', () => startListener()),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration(`${SECTION}.companionPort`)) startListener();
+      if (!e.affectsConfiguration(`${SECTION}.companionPort`)) return;
+      // The settings UI saves on every keystroke (2, 27, 271, ...); only act once typing settles.
+      clearTimeout(portChangeTimer);
+      portChangeTimer = setTimeout(() => void startListener(), PORT_CHANGE_DEBOUNCE_MS);
     }),
+    { dispose: () => clearTimeout(portChangeTimer) },
     { dispose: () => void server?.stop() },
   );
 
-  await startListener();
+  // Not awaited: a port warning waiting for the user must not hold up activation.
+  void startListener();
 }
 
 export async function deactivate(): Promise<void> {
   await server?.stop();
 }
 
-async function startListener(): Promise<void> {
+const PORT_CHANGE_DEBOUNCE_MS = 800;
+let portChangeTimer: NodeJS.Timeout | undefined;
+let listenerQueue: Promise<void> = Promise.resolve();
+
+/** Restarts are queued so two can never interleave and leave a stale status or a leaked socket. */
+function startListener(): Promise<void> {
+  listenerQueue = listenerQueue.then(restartListener);
+  return listenerQueue;
+}
+
+async function restartListener(): Promise<void> {
   if (!server) return;
   await server.stop();
   const { companionPort } = getSettings();
@@ -66,16 +81,18 @@ async function startListener(): Promise<void> {
     const code = (err as NodeJS.ErrnoException).code;
     log.error(`Could not listen on port ${companionPort}`, err);
     showStatus(`$(warning) CP Pilot`, `Not listening (port ${companionPort} unavailable). Click to retry.`);
-    if (code === 'EADDRINUSE') {
-      const choice = await vscode.window.showWarningMessage(
-        `CP Pilot: port ${companionPort} is already in use (CPH uses 27121). ` +
-          `Pick another port and add it under "Custom ports" in Competitive Companion's settings.`,
-        'Change Port',
-      );
+    const reason =
+      code === 'EADDRINUSE'
+        ? `port ${companionPort} is already in use (CPH uses 27121). Pick another port and add it under "Custom ports" in Competitive Companion's settings.`
+        : code === 'EACCES'
+          ? `port ${companionPort} needs admin rights. Pick a port above 1024.`
+          : `couldn't listen on port ${companionPort} (${code ?? String(err)}).`;
+    // Shown without awaiting so the restart queue isn't blocked on the user.
+    void vscode.window.showWarningMessage(`CP Pilot: ${reason}`, 'Change Port').then((choice) => {
       if (choice === 'Change Port') {
-        vscode.commands.executeCommand('workbench.action.openSettings', `${SECTION}.companionPort`);
+        void vscode.commands.executeCommand('workbench.action.openSettings', `${SECTION}.companionPort`);
       }
-    }
+    });
   }
 }
 

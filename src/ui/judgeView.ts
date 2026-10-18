@@ -8,6 +8,7 @@ import { CompileResult, TestRunner } from '../core/runner';
 import { loadProblem, saveProblem } from '../core/store';
 import { CsesApi, CsesApiError, CsesSubmission, CsesUser, csesTaskId, describeSubmission, submissionUrl } from '../cses/api';
 import { CsesAuth } from '../cses/auth';
+import { prepareSubmitFile, shortVerdict } from '../cses/files';
 import { submitAndWait } from '../cses/submitter';
 import { getCsesLanguage, getLanguageCommands } from '../workspace/settings';
 
@@ -20,6 +21,8 @@ interface SubmissionState {
   outcome: 'pending' | 'accepted' | 'rejected' | 'error';
   summary: string;
   compiler?: string;
+  /** Per-test verdicts from CSES, e.g. { number: 3, verdict: "WA", timeMs: 120 }. */
+  tests?: { number: number; verdict: string; timeMs: number | null }[];
 }
 
 /** Results survive switching between files, until the next run of that file. */
@@ -38,6 +41,7 @@ type Message =
   | { type: 'deleteTest'; index: number }
   | { type: 'updateTest'; index: number; input: string; output: string }
   | { type: 'submit' }
+  | { type: 'cancelSubmit' }
   | { type: 'csesLogin' }
   | { type: 'csesLogout' }
   | { type: 'openSubmission'; id: number };
@@ -52,7 +56,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   private readonly runner = new TestRunner();
   private runningFile: string | undefined;
   private runId = 0;
-  private readonly submitting = new Set<string>();
+  private readonly submitting = new Map<string, AbortController>();
   private csesUser: CsesUser | undefined;
   private readonly disposables: vscode.Disposable[] = [];
 
@@ -123,14 +127,21 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       vscode.window.showWarningMessage('CP Pilot: the solution file is empty.');
       return;
     }
+    const upload = prepareSubmitFile(language, file, content);
+    if (!upload.ok) {
+      vscode.window.showWarningMessage(`CP Pilot: ${upload.reason}`);
+      return;
+    }
 
     const token = await this.csesAuth.getToken();
     if (!token) return;
 
     await this.reveal();
     const state = this.stateFor(file);
+    let submissionId: number | undefined;
     const show = (s: SubmissionState) => this.update(file, () => (state.submission = s));
-    this.submitting.add(file);
+    const controller = new AbortController();
+    this.submitting.set(file, controller);
     show({ outcome: 'pending', summary: 'Submitting…' });
 
     try {
@@ -138,9 +149,13 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         api: this.csesApi,
         token,
         taskId,
-        file: { name: path.basename(file), content },
+        file: { name: upload.name, content: upload.content },
         language: getCsesLanguage(language),
-        onUpdate: (s) => show(toSubmissionState(s)),
+        onUpdate: (s) => {
+          submissionId = s.id;
+          show(toSubmissionState(s));
+        },
+        signal: controller.signal,
       });
       const summary = describeSubmission(final);
       const open = 'View on CSES';
@@ -153,7 +168,13 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         if (c === open) void vscode.env.openExternal(vscode.Uri.parse(submissionUrl(final.id)));
       });
     } catch (err) {
-      if (err instanceof CsesApiError && err.isAuthError) {
+      if (controller.signal.aborted) {
+        show({
+          id: submissionId,
+          outcome: 'error',
+          summary: submissionId ? 'Stopped waiting. CSES is still grading it.' : 'Stopped.',
+        });
+      } else if (err instanceof CsesApiError && err.isAuthError) {
         await this.csesAuth.invalidate();
         show({ outcome: 'error', summary: 'CSES login expired. Log in again and resubmit.' });
       } else {
@@ -163,6 +184,11 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       this.submitting.delete(file);
       this.postState();
     }
+  }
+
+  /** Stops following the current file's submission; CSES keeps grading it regardless. */
+  cancelSubmit(): void {
+    if (this.file) this.submitting.get(this.file)?.abort();
   }
 
   private csesTask(): string | undefined {
@@ -275,6 +301,8 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         });
       case 'submit':
         return this.submit();
+      case 'cancelSubmit':
+        return this.cancelSubmit();
       case 'csesLogin':
         await this.csesAuth.login();
         return;
@@ -371,5 +399,11 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
 
 function toSubmissionState(s: CsesSubmission): SubmissionState {
   const outcome = s.pending ? 'pending' : s.result === 'ACCEPTED' ? 'accepted' : 'rejected';
-  return { id: s.id, outcome, summary: describeSubmission(s), compiler: s.compiler?.trim() || undefined };
+  return {
+    id: s.id,
+    outcome,
+    summary: describeSubmission(s),
+    compiler: s.compiler?.trim() || undefined,
+    tests: s.tests?.map((t) => ({ number: t.number, verdict: shortVerdict(t.verdict), timeMs: t.time })),
+  };
 }

@@ -200,13 +200,30 @@
     if (!s) return;
     header.submission.className = `submission ${s.outcome}`;
     const id = s.id;
+    const tests = /** @type {{ number: number, verdict: string, timeMs: number | null }[]} */ (s.tests || []);
     header.submission.replaceChildren(
       h('div', { class: 'submission-head' }, [
         h('strong', {}, [s.summary]),
-        ...(id
-          ? [h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); vscode.postMessage({ type: 'openSubmission', id }); } }, [`#${id}`])]
-          : []),
+        h('span', { class: 'submission-links' }, [
+          ...(cses.submitting ? [link('Stop waiting', 'cancelSubmit'), ' '] : []),
+          ...(id
+            ? [h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); vscode.postMessage({ type: 'openSubmission', id }); } }, [`#${id}`])]
+            : []),
+        ]),
       ]),
+      ...(tests.length
+        ? [
+            h(
+              'div',
+              { class: 'chips' },
+              tests.map((t) =>
+                h('span', { class: `chip v-${t.verdict}`, title: `Test ${t.number}: ${t.verdict}${t.timeMs !== null ? `, ${t.timeMs} ms` : ''}` }, [
+                  String(t.number),
+                ]),
+              ),
+            ),
+          ]
+        : []),
       ...(s.compiler ? [h('pre', {}, [s.compiler])] : []),
     );
   }

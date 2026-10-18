@@ -57,6 +57,9 @@ describe('judgeTest', () => {
       message: 'Killed by SIGSEGV',
     });
     expect(judgeTest(test, run({ outputTruncated: true }), 1000).message).toBe('Output limit exceeded');
+    expect(judgeTest(test, run({ exitCode: 1, stderr: 'A.java:1: error: x\n1 error\nerror: compilation failed\n' }), 1000).message).toBe(
+      'Compilation failed (see stderr)',
+    );
   });
 
   it('falls back to a default time limit', () => {

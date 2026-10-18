@@ -25,6 +25,7 @@ export class CompanionServer {
 
   /** Starts listening. Rejects with an `EADDRINUSE` error if the port is taken (e.g. by CPH). */
   start(port: number): Promise<number> {
+    if (this.server) return Promise.reject(new Error('CompanionServer is already listening; stop it first'));
     const server = http.createServer((req, res) => this.handle(req, res));
     return new Promise((resolve, reject) => {
       server.once('error', reject);

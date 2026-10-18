@@ -60,6 +60,8 @@ export function judgeTest(
 }
 
 function crashMessage(run: ProcessResult, platform: NodeJS.Platform): string {
+  // Java's single-file launcher compiles at run time, so compile errors surface as a failed run.
+  if (/^error: compilation failed$/m.test(run.stderr)) return 'Compilation failed (see stderr)';
   if (run.signal) return `Killed by ${run.signal}`;
   // The shell reports a child killed by signal N as exit code 128 + N.
   if (platform !== 'win32' && run.exitCode !== null && run.exitCode > 128) {

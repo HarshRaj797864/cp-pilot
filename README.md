@@ -13,6 +13,16 @@ Competitive programming in VS Code: import problems from any judge, run tests lo
 
 - **Submit to CSES** from the Judge panel or the editor title bar, with live verdicts (testing progress, result, first failing test, compiler output). Uses the official CSES API: you approve the login in your browser, so CP Pilot never sees your password.
 
+### CSES language notes
+
+CSES picks the language from the file extension ([versions](https://cses.fi/howto/)):
+
+- **Python** runs as PyPy3 by default. Use `cpPilot.cses.languages` → `{ "python": { "option": "CPython3" } }` to change it.
+- **C++** defaults to C++20.
+- **Java**: CSES needs the file named after the class. CP Pilot handles that: it sends your public class (or the class with `main`) as `<Class>.java`.
+- **Node.js**: read input with `readline`, as in CSES's own example. Reading stdin with `fs.readFileSync` gets WRONG ANSWER on CSES even when it works locally.
+- **Go** isn't available on CSES.
+
 ### Planned
 
 - CSES problem browser with solved status
