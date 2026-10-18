@@ -1,0 +1,211 @@
+{
+  "name": "cp-pilot",
+  "displayName": "CP Pilot",
+  "description": "Competitive programming in VS Code: import problems from any judge via Competitive Companion, run tests locally, and get first-class CSES support.",
+  "version": "0.0.1",
+  "publisher": "harshraj",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HarshRaj797864/cp-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HarshRaj797864/cp-pilot/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "competitive programming",
+    "cses",
+    "codeforces",
+    "atcoder",
+    "competitive companion",
+    "cph",
+    "test cases"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Running tests executes your code, so it is disabled in untrusted workspaces."
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cpPilot",
+          "title": "CP Pilot",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "cpPilot": [
+        {
+          "type": "webview",
+          "id": "cpPilot.judge",
+          "name": "Judge"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "cpPilot.runTests",
+        "title": "Run Tests",
+        "category": "CP Pilot",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cpPilot.stopTests",
+        "title": "Stop Tests",
+        "category": "CP Pilot",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "cpPilot.restartListener",
+        "title": "Restart Competitive Companion Listener",
+        "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.cses.submit",
+        "title": "Submit to CSES",
+        "category": "CP Pilot",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "cpPilot.cses.login",
+        "title": "Log In to CSES",
+        "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.cses.logout",
+        "title": "Log Out of CSES",
+        "category": "CP Pilot"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "cpPilot.runTests",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "cpPilot.runTests",
+          "when": "resourceExtname =~ /^\\.(cpp|c|py|java|rs|go|js)$/",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "cpPilot.cses.submit",
+          "when": "cpPilot.isCsesFile",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cpPilot.cses.submit",
+          "when": "cpPilot.isCsesFile"
+        },
+        {
+          "command": "cpPilot.cses.logout",
+          "when": "cpPilot.csesLoggedIn"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CP Pilot",
+      "properties": {
+        "cpPilot.companionPort": {
+          "type": "number",
+          "default": 27121,
+          "minimum": 1,
+          "maximum": 65535,
+          "markdownDescription": "Port to receive problems from the [Competitive Companion](https://github.com/jmerle/competitive-companion) browser extension. `27121` works out of the box. If CPH is also installed, pick another port (e.g. `27122`) and add it under *Custom ports* in Competitive Companion's settings."
+        },
+        "cpPilot.defaultLanguage": {
+          "type": "string",
+          "default": "cpp",
+          "enum": [
+            "cpp",
+            "c",
+            "python",
+            "java",
+            "rust",
+            "go",
+            "js"
+          ],
+          "description": "Language used for the solution file created when a problem is imported."
+        },
+        "cpPilot.templateFile": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a template file whose contents are copied into newly created solution files."
+        },
+        "cpPilot.cses.languages": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Language sent to CSES per file type. By default CSES picks the language from the file extension and uses its default version. Example: `{ \"python\": { \"option\": \"PyPy3\" } }`. Names and options are as shown in CSES's language dropdown.",
+          "propertyNames": {
+            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "name": { "type": ["string", "null"], "description": "Language name, e.g. \"C++\"." },
+              "option": { "type": ["string", "null"], "description": "Version, e.g. \"C++17\" or \"PyPy3\"." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "cpPilot.languageCommands": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Override compile/run commands per language. Placeholders: `${file}`, `${exe}`, `${dir}`, `${stem}`. Example: `{ \"cpp\": { \"compile\": \"g++ -std=c++20 -O2 -DLOCAL -o ${exe} ${file}\" } }`",
+          "propertyNames": {
+            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "compile": { "type": "string", "description": "Compile command (omit for interpreted languages)." },
+              "run": { "type": "string", "description": "Run command." }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run check-types && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run",
+    "vsix": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "~1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
