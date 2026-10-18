@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { CsesLanguage } from '../cses/api';
 import { LanguageCommands, defaultCommands } from '../core/languages';
 import { Language, isLanguage } from '../core/naming';
 
@@ -18,6 +19,14 @@ export function getSettings(): Settings {
     defaultLanguage: isLanguage(language) ? language : 'cpp',
     templateFile: config.get<string>('templateFile', ''),
   };
+}
+
+/** CSES language for a submission; nulls let CSES pick from the file extension and its default version. */
+export function getCsesLanguage(language: Language): CsesLanguage {
+  const overrides = vscode.workspace
+    .getConfiguration(SECTION)
+    .get<Partial<Record<Language, Partial<CsesLanguage>>>>('cses.languages', {});
+  return { name: null, option: null, ...overrides[language] };
 }
 
 /** Built-in commands for a language, with any user overrides from `cpPilot.languageCommands` applied. */

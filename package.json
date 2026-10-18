@@ -75,6 +75,22 @@
         "command": "cpPilot.restartListener",
         "title": "Restart Competitive Companion Listener",
         "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.cses.submit",
+        "title": "Submit to CSES",
+        "category": "CP Pilot",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "cpPilot.cses.login",
+        "title": "Log In to CSES",
+        "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.cses.logout",
+        "title": "Log Out of CSES",
+        "category": "CP Pilot"
       }
     ],
     "keybindings": [
@@ -91,6 +107,23 @@
           "command": "cpPilot.runTests",
           "when": "resourceExtname =~ /^\\.(cpp|c|py|java|rs|go|js)$/",
           "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "cpPilot.cses.submit",
+          "when": "cpPilot.isCsesFile",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cpPilot.cses.submit",
+          "when": "cpPilot.isCsesFile"
+        },
+        {
+          "command": "cpPilot.cses.logout",
+          "when": "cpPilot.csesLoggedIn"
         }
       ]
     },
@@ -122,6 +155,22 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to a template file whose contents are copied into newly created solution files."
+        },
+        "cpPilot.cses.languages": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Language sent to CSES per file type. By default CSES picks the language from the file extension and uses its default version. Example: `{ \"python\": { \"option\": \"PyPy3\" } }`. Names and options are as shown in CSES's language dropdown.",
+          "propertyNames": {
+            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "name": { "type": ["string", "null"], "description": "Language name, e.g. \"C++\"." },
+              "option": { "type": ["string", "null"], "description": "Version, e.g. \"C++17\" or \"PyPy3\"." }
+            },
+            "additionalProperties": false
+          }
         },
         "cpPilot.languageCommands": {
           "type": "object",

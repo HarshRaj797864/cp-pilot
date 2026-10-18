@@ -47,7 +47,7 @@
       app.replaceChildren(h('p', { class: 'empty' }, ['Open a solution file to see its tests.']));
       return;
     }
-    const key = `${state.file}|${state.tests.length}|${!!state.problem}`;
+    const key = `${state.file}|${state.tests.length}|${!!state.problem}|${!!state.cses}`;
     if (key !== layoutKey) {
       layoutKey = key;
       build();
@@ -55,7 +55,10 @@
     update();
   }
 
-  /** @type {{ runAll: HTMLButtonElement, stop: HTMLButtonElement, compile: HTMLElement }} */
+  /**
+   * @type {{ runAll: HTMLButtonElement, stop: HTMLButtonElement, compile: HTMLElement,
+   *   submit: HTMLButtonElement, account: HTMLElement, submission: HTMLElement }}
+   */
   let header;
 
   function build() {
@@ -74,12 +77,17 @@
       runAll: /** @type {HTMLButtonElement} */ (h('button', { onclick: () => vscode.postMessage({ type: 'runAll' }) }, ['▶ Run all'])),
       stop: /** @type {HTMLButtonElement} */ (h('button', { class: 'secondary', onclick: () => vscode.postMessage({ type: 'stop' }) }, ['■ Stop'])),
       compile: h('div', { class: 'compile' }),
+      submit: /** @type {HTMLButtonElement} */ (h('button', { onclick: () => vscode.postMessage({ type: 'submit' }) }, ['⇪ Submit to CSES'])),
+      account: h('div', { class: 'account' }),
+      submission: h('div', { class: 'submission' }),
     };
 
     cards = state.tests.map((/** @type {any} */ _t, /** @type {number} */ i) => buildCard(i));
 
+    const actions = [header.runAll, header.stop, ...(state.cses ? [header.submit] : [])];
     app.replaceChildren(
-      h('header', {}, [title, meta, h('div', { class: 'actions' }, [header.runAll, header.stop])]),
+      h('header', {}, [title, meta, h('div', { class: 'actions' }, actions), ...(state.cses ? [header.account] : [])]),
+      header.submission,
       header.compile,
       ...cards.map((c) => c.root),
       h('button', { class: 'secondary add', onclick: () => vscode.postMessage({ type: 'addTest' }) }, ['+ Add test']),
@@ -140,6 +148,8 @@
       ...(c.status === 'error' ? [h('strong', {}, ['Compilation error']), h('pre', {}, [c.output])] : []),
     );
 
+    updateCses();
+
     cards.forEach((card, i) => {
       const test = state.tests[i];
       // Never overwrite what the user is typing.
@@ -170,6 +180,35 @@
         card.received.hidden = true;
       }
     });
+  }
+
+  function updateCses() {
+    const cses = state.cses;
+    header.submission.hidden = !cses || !cses.submission;
+    if (!cses) return;
+
+    header.submit.disabled = cses.submitting;
+    const link = (/** @type {string} */ text, /** @type {string} */ type) =>
+      h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); vscode.postMessage({ type }); } }, [text]);
+    header.account.replaceChildren(
+      ...(cses.user
+        ? [`CSES: ${cses.user} · `, link('Log out', 'csesLogout')]
+        : ['CSES: not logged in · ', link('Log in', 'csesLogin')]),
+    );
+
+    const s = cses.submission;
+    if (!s) return;
+    header.submission.className = `submission ${s.outcome}`;
+    const id = s.id;
+    header.submission.replaceChildren(
+      h('div', { class: 'submission-head' }, [
+        h('strong', {}, [s.summary]),
+        ...(id
+          ? [h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); vscode.postMessage({ type: 'openSubmission', id }); } }, [`#${id}`])]
+          : []),
+      ]),
+      ...(s.compiler ? [h('pre', {}, [s.compiler])] : []),
+    );
   }
 
   /** @param {HTMLTextAreaElement} el @param {string} value */

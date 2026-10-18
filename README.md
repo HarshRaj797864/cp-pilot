@@ -11,10 +11,12 @@ Competitive programming in VS Code: import problems from any judge, run tests lo
 - **Local judge**: compile and run against all tests with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (or the ▶ in the editor title). Verdicts (AC / WA / TLE / RE / compile error), run times, stderr, and a panel to edit, add or delete tests.
 - C++, C, Python, Java, Rust, Go and JavaScript out of the box, with overridable commands. Unchanged code isn't recompiled.
 
+- **Submit to CSES** from the Judge panel or the editor title bar, with live verdicts (testing progress, result, first failing test, compiler output). Uses the official CSES API: you approve the login in your browser, so CP Pilot never sees your password.
+
 ### Planned
 
 - CSES problem browser with solved status
-- CSES official test download, submit and verdicts
+- CSES official test download
 - Progress stats
 
 ## Usage
@@ -61,6 +63,7 @@ src/
     runner.ts         compile cache + run tests sequentially
   companion/server.ts HTTP listener for Competitive Companion
   workspace/          vscode-facing code (settings, import flow)
+  cses/               official CSES API client, browser login, submit + verdict polling
   ui/judgeView.ts     Judge sidebar webview (logic side)
 media/                webview script and styles
 test/                 vitest unit tests

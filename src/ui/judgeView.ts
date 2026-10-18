@@ -6,15 +6,27 @@ import { languageFromPath } from '../core/languages';
 import { Problem } from '../core/problem';
 import { CompileResult, TestRunner } from '../core/runner';
 import { loadProblem, saveProblem } from '../core/store';
-import { getLanguageCommands } from '../workspace/settings';
+import { CsesApi, CsesApiError, CsesSubmission, CsesUser, csesTaskId, describeSubmission, submissionUrl } from '../cses/api';
+import { CsesAuth } from '../cses/auth';
+import { submitAndWait } from '../cses/submitter';
+import { getCsesLanguage, getLanguageCommands } from '../workspace/settings';
 
 type ResultSlot = TestResult | 'running' | null;
 type CompileState = { status: 'idle' | 'compiling' | 'ok' } | { status: 'error'; output: string };
+
+interface SubmissionState {
+  /** Undefined until CSES accepts the upload. */
+  id?: number;
+  outcome: 'pending' | 'accepted' | 'rejected' | 'error';
+  summary: string;
+  compiler?: string;
+}
 
 /** Results survive switching between files, until the next run of that file. */
 interface FileState {
   results: ResultSlot[];
   compile: CompileState;
+  submission?: SubmissionState;
 }
 
 type Message =
@@ -24,7 +36,11 @@ type Message =
   | { type: 'stop' }
   | { type: 'addTest' }
   | { type: 'deleteTest'; index: number }
-  | { type: 'updateTest'; index: number; input: string; output: string };
+  | { type: 'updateTest'; index: number; input: string; output: string }
+  | { type: 'submit' }
+  | { type: 'csesLogin' }
+  | { type: 'csesLogout' }
+  | { type: 'openSubmission'; id: number };
 
 export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = 'cpPilot.judge';
@@ -36,11 +52,25 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   private readonly runner = new TestRunner();
   private runningFile: string | undefined;
   private runId = 0;
+  private readonly submitting = new Set<string>();
+  private csesUser: CsesUser | undefined;
   private readonly disposables: vscode.Disposable[] = [];
 
-  constructor(private readonly extensionUri: vscode.Uri) {
-    this.disposables.push(vscode.window.onDidChangeActiveTextEditor((e) => this.onEditorChanged(e)));
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly csesApi: CsesApi,
+    private readonly csesAuth: CsesAuth,
+  ) {
+    this.disposables.push(
+      vscode.window.onDidChangeActiveTextEditor((e) => this.onEditorChanged(e)),
+      csesAuth.onDidChange((user) => {
+        this.csesUser = user;
+        this.postState();
+      }),
+    );
     this.onEditorChanged(vscode.window.activeTextEditor);
+    // Restore a saved login quietly; failures just mean "not logged in".
+    csesAuth.currentUser().catch(() => undefined);
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -48,14 +78,95 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     const media = vscode.Uri.joinPath(this.extensionUri, 'media');
     view.webview.options = { enableScripts: true, localResourceRoots: [media] };
     view.webview.html = this.html(view.webview, media);
-    view.webview.onDidReceiveMessage((m: Message) => this.onMessage(m), undefined, this.disposables);
+    view.webview.onDidReceiveMessage(
+      (m: Message) =>
+        this.onMessage(m).catch((err) =>
+          vscode.window.showErrorMessage(`CP Pilot: ${err instanceof Error ? err.message : String(err)}`),
+        ),
+      undefined,
+      this.disposables,
+    );
     view.onDidDispose(() => (this.view = undefined), undefined, this.disposables);
   }
 
   /** Re-reads the stored problem, e.g. after a new import for the active file. */
   async refresh(): Promise<void> {
     this.problem = this.file ? await loadProblem(this.file) : undefined;
+    void vscode.commands.executeCommand('setContext', 'cpPilot.isCsesFile', this.csesTask() !== undefined);
     this.postState();
+  }
+
+  async submit(): Promise<void> {
+    const file = this.file;
+    const taskId = this.csesTask();
+    const language = file && languageFromPath(file);
+    if (!file || !taskId || !language) {
+      vscode.window.showInformationMessage('CP Pilot: submitting works for CSES problems imported with Competitive Companion.');
+      return;
+    }
+    if (this.submitting.has(file)) return;
+
+    const failing = this.stateFor(file).results.filter((r) => r && r !== 'running' && r.verdict !== 'AC').length;
+    if (failing > 0) {
+      const choice = await vscode.window.showWarningMessage(
+        `${failing} local test${failing > 1 ? 's' : ''} failed on the last run. Submit anyway?`,
+        { modal: true },
+        'Submit',
+      );
+      if (choice !== 'Submit') return;
+    }
+
+    const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === file);
+    if (doc?.isDirty) await doc.save();
+    const content = doc?.getText() ?? (await vscode.workspace.fs.readFile(vscode.Uri.file(file))).toString();
+    if (!content.trim()) {
+      vscode.window.showWarningMessage('CP Pilot: the solution file is empty.');
+      return;
+    }
+
+    const token = await this.csesAuth.getToken();
+    if (!token) return;
+
+    await this.reveal();
+    const state = this.stateFor(file);
+    const show = (s: SubmissionState) => this.update(file, () => (state.submission = s));
+    this.submitting.add(file);
+    show({ outcome: 'pending', summary: 'Submitting…' });
+
+    try {
+      const final = await submitAndWait({
+        api: this.csesApi,
+        token,
+        taskId,
+        file: { name: path.basename(file), content },
+        language: getCsesLanguage(language),
+        onUpdate: (s) => show(toSubmissionState(s)),
+      });
+      const summary = describeSubmission(final);
+      const open = 'View on CSES';
+      const message = `CSES #${final.id}: ${summary}`;
+      const shown =
+        final.result === 'ACCEPTED'
+          ? vscode.window.showInformationMessage(message, open)
+          : vscode.window.showWarningMessage(message, open);
+      shown.then((c) => {
+        if (c === open) void vscode.env.openExternal(vscode.Uri.parse(submissionUrl(final.id)));
+      });
+    } catch (err) {
+      if (err instanceof CsesApiError && err.isAuthError) {
+        await this.csesAuth.invalidate();
+        show({ outcome: 'error', summary: 'CSES login expired. Log in again and resubmit.' });
+      } else {
+        show({ outcome: 'error', summary: err instanceof Error ? err.message : String(err) });
+      }
+    } finally {
+      this.submitting.delete(file);
+      this.postState();
+    }
+  }
+
+  private csesTask(): string | undefined {
+    return this.problem ? csesTaskId(this.problem.url) : undefined;
   }
 
   async runTests(indices?: number[]): Promise<void> {
@@ -162,6 +273,16 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
           tests[m.index] = { input: m.input, output: m.output };
           results[m.index] = null;
         });
+      case 'submit':
+        return this.submit();
+      case 'csesLogin':
+        await this.csesAuth.login();
+        return;
+      case 'csesLogout':
+        return this.csesAuth.logout();
+      case 'openSubmission':
+        await vscode.env.openExternal(vscode.Uri.parse(submissionUrl(m.id)));
+        return;
     }
   }
 
@@ -219,6 +340,11 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         results: problem?.tests.map((_, i) => state?.results[i] ?? null) ?? [],
         compile: state?.compile ?? { status: 'idle' },
         running: file !== undefined && this.runningFile === file,
+        cses: this.csesTask() && {
+          user: this.csesUser ? (this.csesUser.displayname ?? this.csesUser.username) : null,
+          submitting: file !== undefined && this.submitting.has(file),
+          submission: state?.submission ?? null,
+        },
       },
     });
   }
@@ -241,4 +367,9 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
 </body>
 </html>`;
   }
+}
+
+function toSubmissionState(s: CsesSubmission): SubmissionState {
+  const outcome = s.pending ? 'pending' : s.result === 'ACCEPTED' ? 'accepted' : 'rejected';
+  return { id: s.id, outcome, summary: describeSubmission(s), compiler: s.compiler?.trim() || undefined };
 }

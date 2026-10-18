@@ -205,3 +205,48 @@ pre.stderr {
 [hidden] {
   display: none !important;
 }
+
+.account {
+  margin-top: 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.account a,
+.submission a {
+  color: var(--vscode-textLink-foreground);
+}
+
+.submission {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 2px;
+  border-left: 3px solid var(--vscode-progressBar-background);
+  background: var(--vscode-textBlockQuote-background);
+}
+
+.submission.accepted {
+  border-left-color: var(--vscode-testing-iconPassed);
+}
+
+.submission.accepted strong {
+  color: var(--vscode-testing-iconPassed);
+}
+
+.submission.rejected,
+.submission.error {
+  border-left-color: var(--vscode-testing-iconFailed);
+}
+
+.submission.rejected strong {
+  color: var(--vscode-testing-iconFailed);
+}
+
+.submission-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.submission pre {
+  margin-top: 6px;
+}

@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { CompanionServer } from './companion/server';
+import { CsesApi } from './cses/api';
+import { CsesAuth } from './cses/auth';
 import { JudgeViewProvider } from './ui/judgeView';
 import { importProblem } from './workspace/importer';
 import { SECTION, getSettings } from './workspace/settings';
@@ -14,7 +16,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   statusItem.command = 'cpPilot.restartListener';
   context.subscriptions.push(log, statusItem);
 
-  const judge = new JudgeViewProvider(context.extensionUri);
+  const csesApi = new CsesApi();
+  const csesAuth = new CsesAuth(context.secrets, csesApi);
+  const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth);
 
   server = new CompanionServer(
     async (problem) => {
@@ -26,7 +30,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   context.subscriptions.push(
+    csesAuth,
     judge,
+    vscode.commands.registerCommand('cpPilot.cses.submit', () => judge.submit()),
+    vscode.commands.registerCommand('cpPilot.cses.login', () => csesAuth.login()),
+    vscode.commands.registerCommand('cpPilot.cses.logout', () => csesAuth.logout()),
     vscode.window.registerWebviewViewProvider(JudgeViewProvider.viewId, judge, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
