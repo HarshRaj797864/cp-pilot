@@ -47,11 +47,15 @@ describe('runProcess', () => {
   });
 
   it('stops collecting at the output limit', async () => {
+    // writeSync, not process.stdout.write: on macOS pipe writes are async and a busy loop never flushes them.
+    const flood = "const fs=require('fs'),b='x'.repeat(1e4);for(;;){try{fs.writeSync(1,b)}catch(e){if(e.code!=='EAGAIN')throw e}}";
     const r = await runProcess({
-      command: `${node} -e "for(;;) process.stdout.write('x'.repeat(1e4))"`,
+      command: `${node} -e "${flood}"`,
       cwd: dir,
       maxOutputBytes: 100_000,
+      timeoutMs: 4000,
     });
+    expect(r.timedOut).toBe(false);
     expect(r.outputTruncated).toBe(true);
     expect(r.stdout.length).toBeLessThanOrEqual(100_000);
   });
