@@ -30,6 +30,11 @@ export class CsesAuth implements vscode.Disposable {
     return this.user;
   }
 
+  /** The stored token, without prompting. Pair with currentUser() to know it's still valid. */
+  token(): Thenable<string | undefined> {
+    return this.secrets.get(TOKEN_KEY);
+  }
+
   /** A valid token, starting the login flow if there is none. Undefined if the user doesn't log in. */
   async getToken(): Promise<string | undefined> {
     // If CSES can't be reached the login flow below will report it.

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { CompanionServer } from './companion/server';
 import { CsesApi } from './cses/api';
 import { CsesAuth } from './cses/auth';
+import { CsesProblemsProvider } from './ui/csesTree';
 import { JudgeViewProvider } from './ui/judgeView';
 import { importProblem } from './workspace/importer';
 import { SECTION, getSettings } from './workspace/settings';
@@ -19,6 +20,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const csesApi = new CsesApi();
   const csesAuth = new CsesAuth(context.secrets, csesApi);
   const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth);
+  const problems = new CsesProblemsProvider(context.globalState, csesApi, csesAuth);
+  const problemsView = vscode.window.createTreeView(CsesProblemsProvider.viewId, { treeDataProvider: problems });
+  problems.attach(problemsView);
 
   server = new CompanionServer(
     async (problem) => {
@@ -32,6 +36,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     csesAuth,
     judge,
+    problems,
+    problemsView,
+    judge.onDidAccept((taskId) => problems.markSolved(taskId)),
+    vscode.commands.registerCommand('cpPilot.cses.refreshProblems', () => problems.refresh()),
+    vscode.commands.registerCommand('cpPilot.cses.searchProblems', () => problems.search()),
+    vscode.commands.registerCommand('cpPilot.cses.clearSearch', () => problems.clearSearch()),
+    vscode.commands.registerCommand('cpPilot.cses.hideSolved', () => problems.setHideSolved(true)),
+    vscode.commands.registerCommand('cpPilot.cses.showSolved', () => problems.setHideSolved(false)),
+    vscode.commands.registerCommand('cpPilot.cses.openProblem', (url: string) =>
+      vscode.env.openExternal(vscode.Uri.parse(url)),
+    ),
     vscode.commands.registerCommand('cpPilot.cses.submit', () => judge.submit()),
     vscode.commands.registerCommand('cpPilot.cses.login', () => csesAuth.login()),
     vscode.commands.registerCommand('cpPilot.cses.logout', () => csesAuth.logout()),

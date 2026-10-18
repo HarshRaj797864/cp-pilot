@@ -58,7 +58,10 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   private runId = 0;
   private readonly submitting = new Map<string, AbortController>();
   private csesUser: CsesUser | undefined;
-  private readonly disposables: vscode.Disposable[] = [];
+  private readonly accepted = new vscode.EventEmitter<string>();
+  /** Fires with the CSES task id when a submission is accepted. */
+  readonly onDidAccept = this.accepted.event;
+  private readonly disposables: vscode.Disposable[] = [this.accepted];
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -157,6 +160,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         },
         signal: controller.signal,
       });
+      if (final.result === 'ACCEPTED') this.accepted.fire(taskId);
       const summary = describeSubmission(final);
       const open = 'View on CSES';
       const message = `CSES #${final.id}: ${summary}`;

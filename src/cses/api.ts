@@ -5,6 +5,7 @@
  */
 
 import { HttpTransport, nodeTransport } from '../core/http';
+import { CsesCategory, RawCourseContent, parseProblemList } from './problemList';
 
 export const CSES_API_URL = 'https://cses.fi/api';
 export const PROBLEMSET = 'problemset';
@@ -102,6 +103,11 @@ export class CsesApi {
         content: Buffer.from(file.content, 'utf8').toString('base64'),
       },
     });
+  }
+
+  /** All problem set tasks by category. With a token, each task carries the user's status. */
+  async getProblemList(token?: string): Promise<CsesCategory[]> {
+    return parseProblemList(await this.request<RawCourseContent>('GET', `/courses/${PROBLEMSET}/list`, { token }));
   }
 
   /** With `poll`, CSES holds the request open until grading progresses or a server timeout passes. */
