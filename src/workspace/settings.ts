@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { LanguageCommands, defaultCommands } from '../core/languages';
 import { Language, isLanguage } from '../core/naming';
 
 export const SECTION = 'cpPilot';
@@ -17,4 +18,12 @@ export function getSettings(): Settings {
     defaultLanguage: isLanguage(language) ? language : 'cpp',
     templateFile: config.get<string>('templateFile', ''),
   };
+}
+
+/** Built-in commands for a language, with any user overrides from `cpPilot.languageCommands` applied. */
+export function getLanguageCommands(language: Language): LanguageCommands {
+  const overrides = vscode.workspace
+    .getConfiguration(SECTION)
+    .get<Partial<Record<Language, Partial<LanguageCommands>>>>('languageCommands', {});
+  return { ...defaultCommands()[language], ...overrides[language] };
 }

@@ -8,10 +8,11 @@ Competitive programming in VS Code: import problems from any judge, run tests lo
 
 - **Import from any judge** via the [Competitive Companion](https://github.com/jmerle/competitive-companion) browser extension (Codeforces, AtCoder, CodeChef, CSES and 100+ more).
 - Solution file is created from your template and opened, sample tests are saved alongside it.
+- **Local judge**: compile and run against all tests with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (or the ▶ in the editor title). Verdicts (AC / WA / TLE / RE / compile error), run times, stderr, and a panel to edit, add or delete tests.
+- C++, C, Python, Java, Rust, Go and JavaScript out of the box, with overridable commands. Unchanged code isn't recompiled.
 
 ### Planned
 
-- Local test runner with a judge panel
 - CSES problem browser with solved status
 - CSES official test download, submit and verdicts
 - Progress stats
@@ -31,6 +32,9 @@ Competitive programming in VS Code: import problems from any judge, run tests lo
 | `cpPilot.companionPort` | `27121` | Port for Competitive Companion |
 | `cpPilot.defaultLanguage` | `cpp` | Language of new solution files |
 | `cpPilot.templateFile` | | Path to a template copied into new solution files |
+| `cpPilot.languageCommands` | `{}` | Override compile/run commands, e.g. `{ "cpp": { "compile": "g++ -std=c++20 -O2 -DLOCAL -o ${exe} ${file}" } }` |
+
+Default commands: `g++ -std=gnu++17 -O2`, `gcc -std=gnu11 -O2`, `python3` (`python` on Windows), `java File.java` (Java 11+), `rustc -O`, `go build`, `node`. Binaries go in `.cp-pilot/bin/`; consider adding `.cp-pilot/` to your `.gitignore`.
 
 ## Development
 
@@ -51,8 +55,14 @@ src/
     problem.ts        Problem model + Competitive Companion payload parsing
     naming.ts         solution file naming per language
     store.ts          problem/tests storage in .cp-pilot/
+    languages.ts      per-language compile/run commands
+    process.ts        child process with stdin, timeout, output cap, cancel
+    judge.ts          output comparison and verdicts
+    runner.ts         compile cache + run tests sequentially
   companion/server.ts HTTP listener for Competitive Companion
   workspace/          vscode-facing code (settings, import flow)
+  ui/judgeView.ts     Judge sidebar webview (logic side)
+media/                webview script and styles
 test/                 vitest unit tests
 ```
 

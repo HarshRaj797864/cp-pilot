@@ -33,14 +33,67 @@
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Running tests executes your code, so it is disabled in untrusted workspaces."
+    }
+  },
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "cpPilot",
+          "title": "CP Pilot",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "cpPilot": [
+        {
+          "type": "webview",
+          "id": "cpPilot.judge",
+          "name": "Judge"
+        }
+      ]
+    },
     "commands": [
+      {
+        "command": "cpPilot.runTests",
+        "title": "Run Tests",
+        "category": "CP Pilot",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cpPilot.stopTests",
+        "title": "Stop Tests",
+        "category": "CP Pilot",
+        "icon": "$(debug-stop)"
+      },
       {
         "command": "cpPilot.restartListener",
         "title": "Restart Competitive Companion Listener",
         "category": "CP Pilot"
       }
     ],
+    "keybindings": [
+      {
+        "command": "cpPilot.runTests",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "cpPilot.runTests",
+          "when": "resourceExtname =~ /^\\.(cpp|c|py|java|rs|go|js)$/",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "CP Pilot",
       "properties": {
@@ -69,6 +122,22 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to a template file whose contents are copied into newly created solution files."
+        },
+        "cpPilot.languageCommands": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Override compile/run commands per language. Placeholders: `${file}`, `${exe}`, `${dir}`, `${stem}`. Example: `{ \"cpp\": { \"compile\": \"g++ -std=c++20 -O2 -DLOCAL -o ${exe} ${file}\" } }`",
+          "propertyNames": {
+            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "compile": { "type": "string", "description": "Compile command (omit for interpreted languages)." },
+              "run": { "type": "string", "description": "Run command." }
+            },
+            "additionalProperties": false
+          }
         }
       }
     }
