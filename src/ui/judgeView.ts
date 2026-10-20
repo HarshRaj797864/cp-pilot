@@ -10,9 +10,13 @@ import { CsesApi, CsesApiError, CsesSubmission, CsesUser, csesTaskId, describeSu
 import { CsesAuth } from '../cses/auth';
 import { prepareSubmitFile, shortVerdict } from '../cses/files';
 import { browserSubmitTarget } from '../core/submitLinks';
+import { CPH_SUBMIT_PORT, CphSubmitQueue, codeforcesProblemName } from '../companion/cphSubmit';
+
+/** cph-submit polls every 3 s; give it a few rounds, e.g. while the browser wakes up. */
+const CPH_SUBMIT_WAIT_MS = 12_000;
 import { Language } from '../core/naming';
 import { submitAndWait } from '../cses/submitter';
-import { getCsesLanguage, getLanguageCommands } from '../workspace/settings';
+import { getCodeforcesLanguageId, getCsesLanguage, getLanguageCommands } from '../workspace/settings';
 
 type ResultSlot = TestResult | 'running' | null;
 type CompileState = { status: 'idle' | 'compiling' | 'ok' } | { status: 'error'; output: string };
@@ -69,6 +73,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     private readonly extensionUri: vscode.Uri,
     private readonly csesApi: CsesApi,
     private readonly csesAuth: CsesAuth,
+    private readonly cphSubmit: { queue: CphSubmitQueue; available: () => boolean },
   ) {
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor((e) => this.onEditorChanged(e)),
@@ -124,11 +129,49 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     if (content === undefined) return;
     if (taskId) return this.submitToCses(file, language, taskId, content);
 
+    const target = browserTarget!;
+    if (target.judge === 'Codeforces') {
+      const sent = await this.sendToCphSubmit(this.problem!.url, language, content);
+      if (sent) return;
+    }
     await vscode.env.clipboard.writeText(content);
-    await vscode.env.openExternal(vscode.Uri.parse(browserTarget!.submitUrl, true));
+    await vscode.env.openExternal(vscode.Uri.parse(target.submitUrl, true));
     vscode.window.showInformationMessage(
-      `CP Pilot: code copied. Paste it (Ctrl+V) on the ${browserTarget!.judge} page that just opened, pick your language and submit.`,
+      `CP Pilot: code copied. Paste it (Ctrl+V) on the ${target.judge} page that just opened, pick your language and submit.`,
     );
+  }
+
+  /**
+   * Hands a Codeforces submission to the cph-submit browser add-on, which fills and submits the form
+   * in the user's logged-in browser. Returns false when it isn't reachable, so the caller falls back.
+   */
+  private async sendToCphSubmit(url: string, language: Language, sourceCode: string): Promise<boolean> {
+    const problemName = codeforcesProblemName(url);
+    if (!problemName) return false;
+    if (!this.cphSubmit.available()) {
+      vscode.window.setStatusBarMessage(
+        `$(info) CP Pilot: for one-click Codeforces submit, install cph-submit and use port ${CPH_SUBMIT_PORT}`,
+        10_000,
+      );
+      return false;
+    }
+
+    const payload = { empty: false as const, problemName, url, sourceCode, languageId: getCodeforcesLanguageId(language) };
+    const taken = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: 'Codeforces: waiting for cph-submit in your browser…', cancellable: true },
+      (_progress, cancel) => {
+        cancel.onCancellationRequested(() => this.cphSubmit.queue.cancel());
+        return this.cphSubmit.queue.offer(payload, CPH_SUBMIT_WAIT_MS);
+      },
+    );
+    if (taken) {
+      vscode.window.showInformationMessage(`CP Pilot: sent ${problemName} to Codeforces. Your browser is submitting it; the verdict shows there.`);
+      return true;
+    }
+    vscode.window.showWarningMessage(
+      "CP Pilot: cph-submit didn't respond. Is it installed and is a browser window open? Falling back to copy and open.",
+    );
+    return false;
   }
 
   /** Confirms if local tests failed, saves, and returns the code; undefined if the user backs out. */

@@ -1,6 +1,7 @@
 import * as http from 'node:http';
 import { AddressInfo } from 'node:net';
 import { Batch, InvalidProblemError, Problem, parseBatch, parseCompanionPayload } from '../core/problem';
+import { CphSubmitQueue } from './cphSubmit';
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
 
@@ -16,6 +17,8 @@ export class CompanionServer {
   constructor(
     private readonly onProblem: ProblemHandler,
     private readonly onError: (err: unknown) => void = () => {},
+    /** Serves GET /getSubmit for the cph-submit add-on when given. */
+    private readonly submitQueue?: CphSubmitQueue,
   ) {}
 
   get port(): number | undefined {
@@ -46,6 +49,11 @@ export class CompanionServer {
   }
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
+    if (req.method === 'GET' && req.url?.split('?')[0] === '/getSubmit' && this.submitQueue) {
+      const payload = this.submitQueue.take(req.headers['cph-submit'] === 'true');
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(payload ?? { empty: true }));
+      return;
+    }
     if (req.method !== 'POST') {
       res.writeHead(405).end();
       return;

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { CPH_SUBMIT_PORT, CphSubmitQueue } from './companion/cphSubmit';
 import { CompanionServer } from './companion/server';
 import { CsesApi } from './cses/api';
 import { CsesAuth } from './cses/auth';
@@ -19,7 +20,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const csesApi = new CsesApi();
   const csesAuth = new CsesAuth(context.secrets, csesApi);
-  const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth);
+  const cphSubmitQueue = new CphSubmitQueue();
+  const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth, {
+    queue: cphSubmitQueue,
+    // cph-submit only ever polls CPH's port.
+    available: () => server?.port === CPH_SUBMIT_PORT,
+  });
   const problems = new CsesProblemsProvider(context.globalState, csesApi, csesAuth);
   const problemsView = vscode.window.createTreeView(CsesProblemsProvider.viewId, { treeDataProvider: problems });
   problems.attach(problemsView);
@@ -33,6 +39,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await importer.import(problem, batch);
     },
     (err) => log.error('Failed to handle problem', err),
+    cphSubmitQueue,
   );
 
   context.subscriptions.push(

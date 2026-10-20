@@ -243,6 +243,15 @@
           ],
           "description": "What to open when importing a whole contest from Competitive Companion."
         },
+        "cpPilot.codeforces.languageIds": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Codeforces compiler id used for one-click submit through [cph-submit](https://github.com/agrawal-d/cph-submit), per file type. Defaults match CPH: `cpp` 91 (G++23), `c` 43, `python` 70 (PyPy 3.10), `java` 87, `rust` 98, `go` 32, `js` 55. Example: `{ \"cpp\": 89 }` for G++20. Ids are the values of the language dropdown on Codeforces' submit page.",
+          "propertyNames": {
+            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+          },
+          "additionalProperties": { "type": "integer" }
+        },
         "cpPilot.cses.languages": {
           "type": "object",
           "default": {},
