@@ -13,6 +13,8 @@ Competitive programming in VS Code: import problems from any judge, run tests lo
 
 - **Submit to CSES** from the Judge panel or the editor title bar, with live verdicts (testing progress, result, first failing test, compiler output). Uses the official CSES API: you approve the login in your browser, so CP Pilot never sees your password.
 
+- **CSES problem browser** in the sidebar: all 400 problems by category with your solved (✅) / attempted (❌) status, per-category progress like `12/24`, search by name or id, and a hide-solved toggle. Clicking a problem opens it on cses.fi; import it with Competitive Companion as usual. Updates automatically when a submission is accepted.
+
 ### CSES language notes
 
 CSES picks the language from the file extension ([versions](https://cses.fi/howto/)):
@@ -25,7 +27,6 @@ CSES picks the language from the file extension ([versions](https://cses.fi/howt
 
 ### Planned
 
-- CSES problem browser with solved status
 - CSES official test download
 - Progress stats
 

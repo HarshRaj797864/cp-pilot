@@ -55,6 +55,10 @@
           "type": "webview",
           "id": "cpPilot.judge",
           "name": "Judge"
+        },
+        {
+          "id": "cpPilot.csesProblems",
+          "name": "CSES Problems"
         }
       ]
     },
@@ -91,6 +95,41 @@
         "command": "cpPilot.cses.logout",
         "title": "Log Out of CSES",
         "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.cses.refreshProblems",
+        "title": "Refresh CSES Problems",
+        "category": "CP Pilot",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "cpPilot.cses.searchProblems",
+        "title": "Search CSES Problems",
+        "category": "CP Pilot",
+        "icon": "$(search)"
+      },
+      {
+        "command": "cpPilot.cses.clearSearch",
+        "title": "Clear CSES Search",
+        "category": "CP Pilot",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "cpPilot.cses.hideSolved",
+        "title": "Hide Solved CSES Problems",
+        "category": "CP Pilot",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "cpPilot.cses.showSolved",
+        "title": "Show Solved CSES Problems",
+        "category": "CP Pilot",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "cpPilot.cses.openProblem",
+        "title": "Open on CSES",
+        "category": "CP Pilot"
       }
     ],
     "keybindings": [
@@ -116,7 +155,42 @@
           "group": "navigation"
         }
       ],
+      "view/title": [
+        {
+          "command": "cpPilot.cses.searchProblems",
+          "when": "view == cpPilot.csesProblems",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cpPilot.cses.clearSearch",
+          "when": "view == cpPilot.csesProblems && cpPilot.cses.searching",
+          "group": "navigation@2"
+        },
+        {
+          "command": "cpPilot.cses.hideSolved",
+          "when": "view == cpPilot.csesProblems && !cpPilot.cses.hidingSolved",
+          "group": "navigation@3"
+        },
+        {
+          "command": "cpPilot.cses.showSolved",
+          "when": "view == cpPilot.csesProblems && cpPilot.cses.hidingSolved",
+          "group": "navigation@3"
+        },
+        {
+          "command": "cpPilot.cses.refreshProblems",
+          "when": "view == cpPilot.csesProblems",
+          "group": "navigation@4"
+        }
+      ],
       "commandPalette": [
+        {
+          "command": "cpPilot.cses.openProblem",
+          "when": "false"
+        },
+        {
+          "command": "cpPilot.cses.clearSearch",
+          "when": "cpPilot.cses.searching"
+        },
         {
           "command": "cpPilot.cses.submit",
           "when": "cpPilot.isCsesFile"
