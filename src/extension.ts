@@ -100,7 +100,7 @@ async function restartListener(): Promise<void> {
     showStatus(`$(warning) CP Pilot`, `Not listening (port ${companionPort} unavailable). Click to retry.`);
     const reason =
       code === 'EADDRINUSE'
-        ? `port ${companionPort} is already in use (CPH uses 27121). Pick another port and add it under "Custom ports" in Competitive Companion's settings.`
+        ? `port ${companionPort} is already in use by another app (CPH uses 27121, CPOS 27122). Pick a free one such as 27150 and add it under "Custom ports" in Competitive Companion's settings.`
         : code === 'EACCES'
           ? `port ${companionPort} needs admin rights. Pick a port above 1024.`
           : `couldn't listen on port ${companionPort} (${code ?? String(err)}).`;

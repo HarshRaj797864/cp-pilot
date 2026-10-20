@@ -39,7 +39,7 @@ CSES picks the language from the file extension ([versions](https://cses.fi/howt
 2. Open a folder in VS Code. The status bar shows `CP Pilot :27121` when it's listening.
 3. Open a problem page and click the green ➕ button in your browser.
 
-**Using CPH too?** Both default to port `27121`. Set `cpPilot.companionPort` to another port (e.g. `27122`) and add it under *Custom ports* in Competitive Companion's settings.
+**Using CPH or CPOS too?** CPH listens on `27121` and CPOS on `27122`. Set `cpPilot.companionPort` to a free port such as `27150` and add it under *Custom ports* in Competitive Companion's settings.
 
 ## Settings
 
