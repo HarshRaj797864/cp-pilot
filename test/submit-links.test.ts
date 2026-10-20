@@ -17,21 +17,31 @@ describe('browserSubmitTarget', () => {
     expect(browserSubmitTarget(problem)?.submitUrl).toBe(submit);
   });
 
+  it('sends USACO to the problem page, which has the upload form', () => {
+    expect(browserSubmitTarget('http://www.usaco.org/index.php?page=viewproblem2&cpid=834')).toEqual({
+      judge: 'USACO',
+      mode: 'upload',
+      submitUrl: 'https://usaco.org/index.php?page=viewproblem2&cpid=834',
+    });
+    expect(browserSubmitTarget('https://codeforces.com/contest/4/problem/A')?.mode).toBe('paste');
+  });
+
   it.each([
+    'https://usaco.org/index.php?page=contests',
+    'https://usaco.org/index.php?page=viewproblem2&cpid=abc',
     'https://cses.fi/problemset/task/1068',
     'https://codeforces.com/contest/4',
     'https://codeforces.com/blog/entry/1',
     'https://atcoder.jp/contests/abc300',
-    'https://usaco.org/index.php?page=viewproblem2&cpid=834',
     'not a url',
     '',
   ])('has no submit page for %s', (url) => {
     expect(browserSubmitTarget(url)).toBeUndefined();
   });
 
-  it('covers every Codeforces, AtCoder and CodeChef fixture', () => {
+  it('covers every Codeforces, AtCoder, CodeChef and USACO fixture', () => {
     const dir = path.join(__dirname, 'fixtures', 'companion');
-    for (const name of fs.readdirSync(dir).filter((f) => /^(codeforces|atcoder|codechef)_/.test(f))) {
+    for (const name of fs.readdirSync(dir).filter((f) => /^(codeforces|atcoder|codechef|usaco)_/.test(f))) {
       const { result } = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
       for (const problem of Array.isArray(result) ? result : [result]) {
         expect(browserSubmitTarget(problem.url), `${name}: ${problem.url}`).toBeDefined();

@@ -10,6 +10,7 @@ import { CsesApi, CsesApiError, CsesSubmission, CsesUser, csesTaskId, describeSu
 import { CsesAuth } from '../cses/auth';
 import { prepareSubmitFile, shortVerdict } from '../cses/files';
 import { browserSubmitTarget } from '../core/submitLinks';
+import { browserVisiblePath } from '../core/hostPath';
 import { CPH_SUBMIT_PORT, CphSubmitQueue, codeforcesProblemName } from '../companion/cphSubmit';
 
 /** cph-submit polls every 3 s; give it a few rounds, e.g. while the browser wakes up. */
@@ -133,6 +134,15 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     if (target.judge === 'Codeforces') {
       const sent = await this.sendToCphSubmit(this.problem!.url, language, content);
       if (sent) return;
+    }
+    if (target.mode === 'upload') {
+      // The form takes a file: put its path on the clipboard for the file picker.
+      await vscode.env.clipboard.writeText(browserVisiblePath(file));
+      await vscode.env.openExternal(vscode.Uri.parse(target.submitUrl, true));
+      vscode.window.showInformationMessage(
+        `CP Pilot: file path copied. On the ${target.judge} page, log in if needed, click "Choose File", paste the path (Ctrl+V), press Enter, pick your language and submit.`,
+      );
+      return;
     }
     await vscode.env.clipboard.writeText(content);
     await vscode.env.openExternal(vscode.Uri.parse(target.submitUrl, true));

@@ -82,7 +82,7 @@
           'button',
           {
             onclick: () => vscode.postMessage({ type: 'submit' }),
-            title: state.cses ? 'Submit to CSES and follow the verdict here' : `Copy your code and open the ${state.browserSubmit} submit page`,
+            title: state.cses ? 'Submit to CSES and follow the verdict here' : `Open the ${state.browserSubmit} submit page with your code (or file path) on the clipboard`,
           },
           [state.cses ? '⇪ Submit to CSES' : `⇪ Submit on ${state.browserSubmit}`],
         )
