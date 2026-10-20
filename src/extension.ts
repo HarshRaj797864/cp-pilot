@@ -4,7 +4,7 @@ import { CsesApi } from './cses/api';
 import { CsesAuth } from './cses/auth';
 import { CsesProblemsProvider } from './ui/csesTree';
 import { JudgeViewProvider } from './ui/judgeView';
-import { importProblem } from './workspace/importer';
+import { ProblemImporter } from './workspace/importer';
 import { SECTION, getSettings } from './workspace/settings';
 
 let server: CompanionServer | undefined;
@@ -24,16 +24,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const problemsView = vscode.window.createTreeView(CsesProblemsProvider.viewId, { treeDataProvider: problems });
   problems.attach(problemsView);
 
+  const importer = new ProblemImporter(() => judge.refresh());
   server = new CompanionServer(
-    async (problem) => {
-      log.info(`Received "${problem.name}" (${problem.group}) with ${problem.tests.length} tests`);
-      await importProblem(problem);
-      await judge.refresh();
+    async (problem, batch) => {
+      const io = problem.io ? ` (file I/O: ${problem.io.inputFile ?? 'stdin'} -> ${problem.io.outputFile ?? 'stdout'})` : '';
+      log.info(`Received "${problem.name}" (${problem.group}) with ${problem.tests.length} tests${io}`);
+      await importer.import(problem, batch);
     },
     (err) => log.error('Failed to handle problem', err),
   );
 
   context.subscriptions.push(
+    importer,
     csesAuth,
     judge,
     problems,

@@ -1,10 +1,10 @@
 import * as http from 'node:http';
 import { AddressInfo } from 'node:net';
-import { InvalidProblemError, Problem, parseCompanionPayload } from '../core/problem';
+import { Batch, InvalidProblemError, Problem, parseBatch, parseCompanionPayload } from '../core/problem';
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
 
-export type ProblemHandler = (problem: Problem) => void | Promise<void>;
+export type ProblemHandler = (problem: Problem, batch: Batch | undefined) => void | Promise<void>;
 
 /**
  * Receives problems from the Competitive Companion browser extension, which POSTs
@@ -65,8 +65,11 @@ export class CompanionServer {
     req.on('end', async () => {
       if (res.writableEnded) return;
       let problem: Problem;
+      let batch: Batch | undefined;
       try {
-        problem = parseCompanionPayload(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+        const payload: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        problem = parseCompanionPayload(payload);
+        batch = parseBatch(payload);
       } catch (err) {
         res.writeHead(400).end(err instanceof InvalidProblemError ? err.message : 'Invalid JSON');
         this.onError(err);
@@ -75,7 +78,7 @@ export class CompanionServer {
       // Respond before handling so the browser extension isn't kept waiting on file I/O.
       res.writeHead(200).end();
       try {
-        await this.onProblem(problem);
+        await this.onProblem(problem, batch);
       } catch (err) {
         this.onError(err);
       }

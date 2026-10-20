@@ -8,6 +8,9 @@ Competitive programming in VS Code: import problems from any judge, run tests lo
 
 - **Import from any judge** via the [Competitive Companion](https://github.com/jmerle/competitive-companion) browser extension (Codeforces, AtCoder, CodeChef, CSES and 100+ more).
 - Solution file is created from your template and opened, sample tests are saved alongside it.
+  - **Whole contests**: importing a contest page creates every problem's file but opens only the first, with an *Open All* button.
+  - **File I/O problems** (USACO, some Codeforces): the input file is provided and the output file is read, in a temporary folder.
+  - Re-importing a problem keeps your code. A *different* problem with the same name gets its own file (`A_Echo_2.cpp`), and non-English titles get the task id added (`A_colopl2018_final_a.cpp`).
 - **Local judge**: compile and run against all tests with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (or the ▶ in the editor title). Verdicts (AC / WA / TLE / RE / compile error), run times, stderr, and a panel to edit, add or delete tests.
 - C++, C, Python, Java, Rust, Go and JavaScript out of the box, with overridable commands. Unchanged code isn't recompiled.
 

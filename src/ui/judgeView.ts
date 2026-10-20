@@ -238,6 +238,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         tests: problem.tests,
         indices: targets,
         timeLimitMs: problem.timeLimit,
+        io: problem.io,
         commands: getLanguageCommands(language),
         onCompileStart: () => this.update(file, () => (state.compile = { status: 'compiling' })),
         onCompileEnd: (r: CompileResult) =>
