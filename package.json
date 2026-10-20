@@ -81,8 +81,8 @@
         "category": "CP Pilot"
       },
       {
-        "command": "cpPilot.cses.submit",
-        "title": "Submit to CSES",
+        "command": "cpPilot.submit",
+        "title": "Submit Solution",
         "category": "CP Pilot",
         "icon": "$(cloud-upload)"
       },
@@ -150,8 +150,8 @@
       ],
       "editor/title": [
         {
-          "command": "cpPilot.cses.submit",
-          "when": "cpPilot.isCsesFile",
+          "command": "cpPilot.submit",
+          "when": "cpPilot.canSubmit",
           "group": "navigation"
         }
       ],
@@ -192,8 +192,8 @@
           "when": "cpPilot.cses.searching"
         },
         {
-          "command": "cpPilot.cses.submit",
-          "when": "cpPilot.isCsesFile"
+          "command": "cpPilot.submit",
+          "when": "cpPilot.canSubmit"
         },
         {
           "command": "cpPilot.cses.logout",

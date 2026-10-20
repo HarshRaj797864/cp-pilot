@@ -50,7 +50,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('cpPilot.cses.openProblem', (url: string) =>
       vscode.env.openExternal(vscode.Uri.parse(url)),
     ),
-    vscode.commands.registerCommand('cpPilot.cses.submit', () => judge.submit()),
+    vscode.commands.registerCommand('cpPilot.submit', () => judge.submit()),
     vscode.commands.registerCommand('cpPilot.cses.login', () => csesAuth.login()),
     vscode.commands.registerCommand('cpPilot.cses.logout', () => csesAuth.logout()),
     vscode.window.registerWebviewViewProvider(JudgeViewProvider.viewId, judge, {

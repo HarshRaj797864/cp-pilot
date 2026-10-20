@@ -9,6 +9,8 @@ import { loadProblem, saveProblem } from '../core/store';
 import { CsesApi, CsesApiError, CsesSubmission, CsesUser, csesTaskId, describeSubmission, submissionUrl } from '../cses/api';
 import { CsesAuth } from '../cses/auth';
 import { prepareSubmitFile, shortVerdict } from '../cses/files';
+import { browserSubmitTarget } from '../core/submitLinks';
+import { Language } from '../core/naming';
 import { submitAndWait } from '../cses/submitter';
 import { getCsesLanguage, getLanguageCommands } from '../workspace/settings';
 
@@ -99,20 +101,38 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   /** Re-reads the stored problem, e.g. after a new import for the active file. */
   async refresh(): Promise<void> {
     this.problem = this.file ? await loadProblem(this.file) : undefined;
-    void vscode.commands.executeCommand('setContext', 'cpPilot.isCsesFile', this.csesTask() !== undefined);
+    const canSubmit = this.csesTask() !== undefined || (this.problem !== undefined && browserSubmitTarget(this.problem.url) !== undefined);
+    void vscode.commands.executeCommand('setContext', 'cpPilot.canSubmit', canSubmit);
     this.postState();
   }
 
+  /** Submits the current file: through the CSES API, or by copying it and opening the judge's submit page. */
   async submit(): Promise<void> {
     const file = this.file;
-    const taskId = this.csesTask();
     const language = file && languageFromPath(file);
-    if (!file || !taskId || !language) {
-      vscode.window.showInformationMessage('CP Pilot: submitting works for CSES problems imported with Competitive Companion.');
+    const taskId = this.csesTask();
+    const browserTarget = this.problem ? browserSubmitTarget(this.problem.url) : undefined;
+    if (!file || !language || (!taskId && !browserTarget)) {
+      vscode.window.showInformationMessage(
+        'CP Pilot: submitting works for CSES, Codeforces, AtCoder and CodeChef problems imported with Competitive Companion.',
+      );
       return;
     }
     if (this.submitting.has(file)) return;
 
+    const content = await this.readForSubmit(file);
+    if (content === undefined) return;
+    if (taskId) return this.submitToCses(file, language, taskId, content);
+
+    await vscode.env.clipboard.writeText(content);
+    await vscode.env.openExternal(vscode.Uri.parse(browserTarget!.submitUrl, true));
+    vscode.window.showInformationMessage(
+      `CP Pilot: code copied. Paste it (Ctrl+V) on the ${browserTarget!.judge} page that just opened, pick your language and submit.`,
+    );
+  }
+
+  /** Confirms if local tests failed, saves, and returns the code; undefined if the user backs out. */
+  private async readForSubmit(file: string): Promise<string | undefined> {
     const failing = this.stateFor(file).results.filter((r) => r && r !== 'running' && r.verdict !== 'AC').length;
     if (failing > 0) {
       const choice = await vscode.window.showWarningMessage(
@@ -120,7 +140,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         { modal: true },
         'Submit',
       );
-      if (choice !== 'Submit') return;
+      if (choice !== 'Submit') return undefined;
     }
 
     const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === file);
@@ -128,8 +148,12 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     const content = doc?.getText() ?? (await vscode.workspace.fs.readFile(vscode.Uri.file(file))).toString();
     if (!content.trim()) {
       vscode.window.showWarningMessage('CP Pilot: the solution file is empty.');
-      return;
+      return undefined;
     }
+    return content;
+  }
+
+  private async submitToCses(file: string, language: Language, taskId: string, content: string): Promise<void> {
     const upload = prepareSubmitFile(language, file, content);
     if (!upload.ok) {
       vscode.window.showWarningMessage(`CP Pilot: ${upload.reason}`);
@@ -373,6 +397,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         results: problem?.tests.map((_, i) => state?.results[i] ?? null) ?? [],
         compile: state?.compile ?? { status: 'idle' },
         running: file !== undefined && this.runningFile === file,
+        browserSubmit: (!this.csesTask() && problem && browserSubmitTarget(problem.url)?.judge) || null,
         cses: this.csesTask() && {
           user: this.csesUser ? (this.csesUser.displayname ?? this.csesUser.username) : null,
           submitting: file !== undefined && this.submitting.has(file),
