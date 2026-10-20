@@ -9,6 +9,8 @@ export interface Settings {
   companionPort: number;
   defaultLanguage: Language;
   templateFile: string;
+  /** For contest imports: open a tab per problem, or just the first one. */
+  openContestProblems: 'all' | 'first';
 }
 
 export function getSettings(): Settings {
@@ -18,6 +20,7 @@ export function getSettings(): Settings {
     companionPort: config.get<number>('companionPort', 27121),
     defaultLanguage: isLanguage(language) ? language : 'cpp',
     templateFile: config.get<string>('templateFile', ''),
+    openContestProblems: config.get<string>('openContestProblems', 'all') === 'first' ? 'first' : 'all',
   };
 }
 

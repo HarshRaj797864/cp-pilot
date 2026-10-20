@@ -230,6 +230,19 @@
           "default": "",
           "description": "Absolute path to a template file whose contents are copied into newly created solution files."
         },
+        "cpPilot.openContestProblems": {
+          "type": "string",
+          "default": "all",
+          "enum": [
+            "all",
+            "first"
+          ],
+          "enumDescriptions": [
+            "Open a tab for every problem (A, B, C…), with the first one focused.",
+            "Open only the first problem; the others are created but not opened."
+          ],
+          "description": "What to open when importing a whole contest from Competitive Companion."
+        },
         "cpPilot.cses.languages": {
           "type": "object",
           "default": {},

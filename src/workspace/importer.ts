@@ -15,7 +15,10 @@ interface PendingBatch {
   timer?: NodeJS.Timeout;
 }
 
-/** Imports problems from Competitive Companion. A whole contest opens its first problem, not one tab each. */
+/**
+ * Imports problems from Competitive Companion. A whole contest arrives as separate requests;
+ * they're collected so the tabs open in order (A, B, C…) with the first problem focused.
+ */
 export class ProblemImporter {
   private readonly batches = new Map<string, PendingBatch>();
 
@@ -66,26 +69,28 @@ export class ProblemImporter {
     this.batches.delete(id);
 
     const files = [...pending.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    if (getSettings().openContestProblems === 'all') {
+      // Open in order so tabs read A, B, C…, then come back to the first problem.
+      for (const f of files) await openFile(f.path, true);
+    }
     await openFile(files[0].path);
     await this.onImported();
 
     const missing = pending.size - files.length;
     const where = pending.group ? ` from ${pending.group}` : '';
-    const message =
-      `CP Pilot: imported ${files.length} problems${where}.` +
-      (missing > 0 ? ` ${missing} didn't arrive; send them again from the browser.` : '');
-    // Notifications can be hidden (Do Not Disturb) or time out, so the status bar says it too.
-    vscode.window.setStatusBarMessage(`$(check) ${message.replace(/^CP Pilot: /, 'CP Pilot ')}`, 15_000);
-    const choice = await vscode.window.showInformationMessage(message, 'Open All');
-    if (choice === 'Open All') {
-      for (const f of files) await openFile(f.path);
+    const summary = `imported ${files.length} problems${where}`;
+    vscode.window.setStatusBarMessage(`$(check) CP Pilot: ${summary}`, 10_000);
+    if (missing > 0) {
+      vscode.window.showWarningMessage(
+        `CP Pilot: ${summary}, but ${missing} didn't arrive. Send the contest again from the browser.`,
+      );
     }
   }
 }
 
-async function openFile(file: string): Promise<void> {
+async function openFile(file: string, preserveFocus = false): Promise<void> {
   const doc = await vscode.workspace.openTextDocument(file);
-  await vscode.window.showTextDocument(doc, { preview: false });
+  await vscode.window.showTextDocument(doc, { preview: false, preserveFocus });
 }
 
 async function readTemplate(templateFile: string): Promise<string> {
