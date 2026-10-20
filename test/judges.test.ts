@@ -53,6 +53,10 @@ describe('real Competitive Companion payloads', () => {
     expect(problemFileStem({ name: 'A. Watermelon', url: 'https://codeforces.com/problemset/problem/4/A' })).toBe('A_Watermelon');
     expect(problemFileStem({ name: 'Résumé', url: 'https://x.com/r' })).toBe('Resume');
     expect(problemFileStem({ name: 'ファイティング', url: '' })).toBe('problem');
+    // Symbols aren't letters, so no task id gets added (a real Codeforces title).
+    expect(problemFileStem({ name: 'E. Good Substrings☆Favorite', url: 'https://codeforces.com/contest/2200/problem/E' })).toBe(
+      'E_Good_Substrings_Favorite',
+    );
   });
 });
 

@@ -74,6 +74,8 @@ export class ProblemImporter {
     const message =
       `CP Pilot: imported ${files.length} problems${where}.` +
       (missing > 0 ? ` ${missing} didn't arrive; send them again from the browser.` : '');
+    // Notifications can be hidden (Do Not Disturb) or time out, so the status bar says it too.
+    vscode.window.setStatusBarMessage(`$(check) ${message.replace(/^CP Pilot: /, 'CP Pilot ')}`, 15_000);
     const choice = await vscode.window.showInformationMessage(message, 'Open All');
     if (choice === 'Open All') {
       for (const f of files) await openFile(f.path);

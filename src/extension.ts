@@ -28,7 +28,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   server = new CompanionServer(
     async (problem, batch) => {
       const io = problem.io ? ` (file I/O: ${problem.io.inputFile ?? 'stdin'} -> ${problem.io.outputFile ?? 'stdout'})` : '';
-      log.info(`Received "${problem.name}" (${problem.group}) with ${problem.tests.length} tests${io}`);
+      const part = batch ? ` [batch ${batch.id.slice(0, 8)}, size ${batch.size}]` : ' [no batch info]';
+      log.info(`Received "${problem.name}" (${problem.group}) with ${problem.tests.length} tests${io}${part}`);
       await importer.import(problem, batch);
     },
     (err) => log.error('Failed to handle problem', err),

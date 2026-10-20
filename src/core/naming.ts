@@ -30,7 +30,8 @@ export function toFileStem(problemName: string): string {
  */
 export function problemFileStem(problem: { name: string; url: string }): string {
   const stem = toFileStem(problem.name);
-  const lostLetters = /[^\x00-\x7F]/.test(problem.name.normalize('NFKD').replace(/[̀-ͯ]/g, ''));
+  // Only letters count: symbols like "☆" or "–" dropping out doesn't make names ambiguous.
+  const lostLetters = /(?![A-Za-z])\p{L}/u.test(problem.name.normalize('NFKD').replace(/[̀-ͯ]/g, ''));
   const slug = lostLetters ? urlSlug(problem.url) : undefined;
   if (!slug) return stem;
   return stem === 'problem' ? slug : `${stem}_${slug}`;
