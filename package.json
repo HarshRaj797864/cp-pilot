@@ -1,10 +1,20 @@
 {
   "name": "cp-pilot",
   "displayName": "CP Pilot",
-  "description": "Competitive programming in VS Code: import problems from any judge via Competitive Companion, run tests locally, and get first-class CSES support.",
-  "version": "0.0.1",
-  "publisher": "harshraj",
+  "description": "Competitive programming in VS Code: import problems from Codeforces, AtCoder, CSES, USACO and 100+ judges, run tests locally, submit, and track your CSES progress.",
+  "version": "0.1.0",
+  "preview": true,
+  "publisher": "harshraj797864",
+  "author": {
+    "name": "Harsh Raj"
+  },
   "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1E3A8A",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/HarshRaj797864/cp-pilot#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/HarshRaj797864/cp-pilot.git"
@@ -12,22 +22,32 @@
   "bugs": {
     "url": "https://github.com/HarshRaj797864/cp-pilot/issues"
   },
+  "qna": "https://github.com/HarshRaj797864/cp-pilot/discussions",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Programming Languages",
     "Testing",
+    "Education",
     "Other"
   ],
   "keywords": [
     "competitive programming",
+    "cp",
     "cses",
     "codeforces",
     "atcoder",
+    "codechef",
+    "usaco",
+    "leetcode",
     "competitive companion",
     "cph",
-    "test cases"
+    "test cases",
+    "judge",
+    "icpc",
+    "olympiad",
+    "submit"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -81,8 +101,8 @@
         "category": "CP Pilot"
       },
       {
-        "command": "cpPilot.cses.submit",
-        "title": "Submit to CSES",
+        "command": "cpPilot.submit",
+        "title": "Submit Solution",
         "category": "CP Pilot",
         "icon": "$(cloud-upload)"
       },
@@ -150,8 +170,8 @@
       ],
       "editor/title": [
         {
-          "command": "cpPilot.cses.submit",
-          "when": "cpPilot.isCsesFile",
+          "command": "cpPilot.submit",
+          "when": "cpPilot.canSubmit",
           "group": "navigation"
         }
       ],
@@ -192,8 +212,8 @@
           "when": "cpPilot.cses.searching"
         },
         {
-          "command": "cpPilot.cses.submit",
-          "when": "cpPilot.isCsesFile"
+          "command": "cpPilot.submit",
+          "when": "cpPilot.canSubmit"
         },
         {
           "command": "cpPilot.cses.logout",
@@ -209,7 +229,7 @@
           "default": 27121,
           "minimum": 1,
           "maximum": 65535,
-          "markdownDescription": "Port to receive problems from the [Competitive Companion](https://github.com/jmerle/competitive-companion) browser extension. `27121` works out of the box. If CPH is also installed, pick another port (e.g. `27122`) and add it under *Custom ports* in Competitive Companion's settings."
+          "markdownDescription": "Port to receive problems from the [Competitive Companion](https://github.com/jmerle/competitive-companion) browser extension. `27121` works out of the box. If another CP extension uses it (CPH uses `27121`, CPOS `27122`), pick a free port such as `27150` and add it under *Custom ports* in Competitive Companion's settings."
         },
         "cpPilot.defaultLanguage": {
           "type": "string",
@@ -229,6 +249,28 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to a template file whose contents are copied into newly created solution files."
+        },
+        "cpPilot.openContestProblems": {
+          "type": "string",
+          "default": "all",
+          "enum": [
+            "all",
+            "first"
+          ],
+          "enumDescriptions": [
+            "Open a tab for every problem (A, B, C…), with the first one focused.",
+            "Open only the first problem; the others are created but not opened."
+          ],
+          "description": "What to open when importing a whole contest from Competitive Companion."
+        },
+        "cpPilot.codeforces.languageIds": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Codeforces compiler id used for one-click submit through [cph-submit](https://github.com/agrawal-d/cph-submit), per file type. Defaults match CPH: `cpp` 91 (G++23), `c` 43, `python` 70 (PyPy 3.10), `java` 87, `rust` 98, `go` 32, `js` 55. Example: `{ \"cpp\": 89 }` for G++20. Ids are the values of the language dropdown on Codeforces' submit page.",
+          "propertyNames": {
+            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+          },
+          "additionalProperties": { "type": "integer" }
         },
         "cpPilot.cses.languages": {
           "type": "object",

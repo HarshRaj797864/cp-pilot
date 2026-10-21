@@ -58,6 +58,7 @@ describe('naming', () => {
   });
 
   it('adds the language extension', () => {
-    expect(solutionFileName('A. Watermelon', 'python')).toBe('A_Watermelon.py');
+    expect(solutionFileName({ name: 'A. Watermelon', url: '' }, 'python')).toBe('A_Watermelon.py');
+    expect(solutionFileName({ name: 'A. Watermelon', url: '' }, 'cpp', 2)).toBe('A_Watermelon_2.cpp');
   });
 });

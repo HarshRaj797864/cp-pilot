@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an idea or a judge to support better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like CP Pilot to do?
+      description: Describe the problem it solves for you, not only the solution.
+      placeholder: When I practise on AtCoder I still have to paste my code…
+    validations:
+      required: true
+  - type: input
+    id: judge
+    attributes:
+      label: Which judge(s)?
+      placeholder: AtCoder, CodeChef, all…
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How do you do this today?
+      description: Another tool, a workaround, or by hand.

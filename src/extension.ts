@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
+import { CPH_SUBMIT_PORT, CphSubmitQueue } from './companion/cphSubmit';
 import { CompanionServer } from './companion/server';
 import { CsesApi } from './cses/api';
 import { CsesAuth } from './cses/auth';
 import { CsesProblemsProvider } from './ui/csesTree';
 import { JudgeViewProvider } from './ui/judgeView';
-import { importProblem } from './workspace/importer';
+import { ProblemImporter } from './workspace/importer';
 import { SECTION, getSettings } from './workspace/settings';
 
 let server: CompanionServer | undefined;
@@ -19,21 +20,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const csesApi = new CsesApi();
   const csesAuth = new CsesAuth(context.secrets, csesApi);
-  const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth);
+  const cphSubmitQueue = new CphSubmitQueue();
+  const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth, {
+    queue: cphSubmitQueue,
+    // cph-submit only ever polls CPH's port.
+    available: () => server?.port === CPH_SUBMIT_PORT,
+  });
   const problems = new CsesProblemsProvider(context.globalState, csesApi, csesAuth);
   const problemsView = vscode.window.createTreeView(CsesProblemsProvider.viewId, { treeDataProvider: problems });
   problems.attach(problemsView);
 
+  const importer = new ProblemImporter(() => judge.refresh());
   server = new CompanionServer(
-    async (problem) => {
-      log.info(`Received "${problem.name}" (${problem.group}) with ${problem.tests.length} tests`);
-      await importProblem(problem);
-      await judge.refresh();
+    async (problem, batch) => {
+      const io = problem.io ? ` (file I/O: ${problem.io.inputFile ?? 'stdin'} -> ${problem.io.outputFile ?? 'stdout'})` : '';
+      const part = batch ? ` [batch ${batch.id.slice(0, 8)}, size ${batch.size}]` : ' [no batch info]';
+      log.info(`Received "${problem.name}" (${problem.group}) with ${problem.tests.length} tests${io}${part}`);
+      await importer.import(problem, batch);
     },
     (err) => log.error('Failed to handle problem', err),
+    cphSubmitQueue,
   );
 
   context.subscriptions.push(
+    importer,
     csesAuth,
     judge,
     problems,
@@ -47,7 +57,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('cpPilot.cses.openProblem', (url: string) =>
       vscode.env.openExternal(vscode.Uri.parse(url)),
     ),
-    vscode.commands.registerCommand('cpPilot.cses.submit', () => judge.submit()),
+    vscode.commands.registerCommand('cpPilot.submit', () => judge.submit()),
     vscode.commands.registerCommand('cpPilot.cses.login', () => csesAuth.login()),
     vscode.commands.registerCommand('cpPilot.cses.logout', () => csesAuth.logout()),
     vscode.window.registerWebviewViewProvider(JudgeViewProvider.viewId, judge, {
@@ -98,7 +108,7 @@ async function restartListener(): Promise<void> {
     showStatus(`$(warning) CP Pilot`, `Not listening (port ${companionPort} unavailable). Click to retry.`);
     const reason =
       code === 'EADDRINUSE'
-        ? `port ${companionPort} is already in use (CPH uses 27121). Pick another port and add it under "Custom ports" in Competitive Companion's settings.`
+        ? `port ${companionPort} is already in use by another app (CPH uses 27121, CPOS 27122). Pick a free one such as 27150 and add it under "Custom ports" in Competitive Companion's settings.`
         : code === 'EACCES'
           ? `port ${companionPort} needs admin rights. Pick a port above 1024.`
           : `couldn't listen on port ${companionPort} (${code ?? String(err)}).`;

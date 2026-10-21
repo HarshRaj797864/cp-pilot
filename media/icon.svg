@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1E3A8A"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <!-- flight trail -->
+  <path d="M44 196 C 70 186, 84 176, 100 160" fill="none" stroke="#93C5FD" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 16"/>
+  <!-- paper plane -->
+  <path d="M206 50 L46 116 L106 140 L130 200 Z" fill="#FFFFFF"/>
+  <path d="M206 50 L106 140 L118 170 Z" fill="#DBEAFE"/>
+  <path d="M206 50 L106 140" stroke="#1E3A8A" stroke-width="5" stroke-linecap="round" opacity="0.35"/>
+  <!-- accepted badge -->
+  <circle cx="190" cy="190" r="34" fill="#22C55E" stroke="#1E3A8A" stroke-width="8"/>
+  <path d="M174 191 L186 203 L207 180" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

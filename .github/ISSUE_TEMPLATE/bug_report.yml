@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in CP Pilot doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report this! The more detail, the faster it gets fixed.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+      placeholder: I clicked ➕ on a Codeforces contest page and only problem A was created…
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Importing problems (Competitive Companion)
+        - Running tests (Judge panel)
+        - Submitting
+        - CSES problem browser / login
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: problem
+    attributes:
+      label: Problem URL (if any)
+      placeholder: https://codeforces.com/contest/4/problem/A
+  - type: input
+    id: language
+    attributes:
+      label: Language and compiler
+      placeholder: C++, g++ 13.2
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Windows + WSL
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: CP Pilot and VS Code versions
+      description: Extensions view → CP Pilot for its version; Help → About for VS Code's.
+      placeholder: CP Pilot 0.1.0, VS Code 1.95
+  - type: textarea
+    id: log
+    attributes:
+      label: Log output
+      description: View → Output, then pick "CP Pilot" in the dropdown. Paste anything relevant.
+      render: text
