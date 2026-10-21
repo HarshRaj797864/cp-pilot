@@ -1,10 +1,20 @@
 {
   "name": "cp-pilot",
   "displayName": "CP Pilot",
-  "description": "Competitive programming in VS Code: import problems from any judge via Competitive Companion, run tests locally, and get first-class CSES support.",
-  "version": "0.0.1",
-  "publisher": "harshraj",
+  "description": "Competitive programming in VS Code: import problems from Codeforces, AtCoder, CSES, USACO and 100+ judges, run tests locally, submit, and track your CSES progress.",
+  "version": "0.1.0",
+  "preview": true,
+  "publisher": "harshraj797864",
+  "author": {
+    "name": "Harsh Raj"
+  },
   "license": "MIT",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#1E3A8A",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/HarshRaj797864/cp-pilot#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/HarshRaj797864/cp-pilot.git"
@@ -12,22 +22,32 @@
   "bugs": {
     "url": "https://github.com/HarshRaj797864/cp-pilot/issues"
   },
+  "qna": "https://github.com/HarshRaj797864/cp-pilot/discussions",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
     "Programming Languages",
     "Testing",
+    "Education",
     "Other"
   ],
   "keywords": [
     "competitive programming",
+    "cp",
     "cses",
     "codeforces",
     "atcoder",
+    "codechef",
+    "usaco",
+    "leetcode",
     "competitive companion",
     "cph",
-    "test cases"
+    "test cases",
+    "judge",
+    "icpc",
+    "olympiad",
+    "submit"
   ],
   "activationEvents": [
     "onStartupFinished"
