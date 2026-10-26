@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or idea to discuss
+    url: https://github.com/HarshRaj797864/cp-pilot/discussions
+    about: Not sure it's a bug? Ask in Discussions.

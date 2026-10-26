@@ -24,6 +24,30 @@ export function toFileStem(problemName: string): string {
   return stem || 'problem';
 }
 
-export function solutionFileName(problemName: string, language: Language): string {
-  return `${toFileStem(problemName)}.${LANGUAGE_EXTENSIONS[language]}`;
+/**
+ * File stem for a problem. Names in other scripts (e.g. AtCoder's "A - ファイティング・タカハシ")
+ * lose most of their characters, so the task id from the URL is added to keep them distinct.
+ */
+export function problemFileStem(problem: { name: string; url: string }): string {
+  const stem = toFileStem(problem.name);
+  // Only letters count: symbols like "☆" or "–" dropping out doesn't make names ambiguous.
+  const lostLetters = /(?![A-Za-z])\p{L}/u.test(problem.name.normalize('NFKD').replace(/[̀-ͯ]/g, ''));
+  const slug = lostLetters ? urlSlug(problem.url) : undefined;
+  if (!slug) return stem;
+  return stem === 'problem' ? slug : `${stem}_${slug}`;
+}
+
+function urlSlug(url: string): string | undefined {
+  try {
+    const last = new URL(url).pathname.split('/').filter(Boolean).pop();
+    const slug = last && toFileStem(last);
+    return slug && slug !== 'problem' ? slug : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function solutionFileName(problem: { name: string; url: string }, language: Language, copy = 1): string {
+  const suffix = copy > 1 ? `_${copy}` : '';
+  return `${problemFileStem(problem)}${suffix}.${LANGUAGE_EXTENSIONS[language]}`;
 }

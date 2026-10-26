@@ -1,9 +1,10 @@
 import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { TestResult, effectiveTimeLimit, hardTimeout, judgeTest } from './judge';
 import { LanguageCommands, ResolvedCommands, resolveCommands } from './languages';
 import { runProcess } from './process';
-import { TestCase } from './problem';
+import { Problem, TestCase } from './problem';
 
 const COMPILE_TIMEOUT_MS = 60_000;
 
@@ -16,6 +17,7 @@ export interface RunOptions {
   indices?: number[];
   timeLimitMs: number;
   commands: LanguageCommands;
+  io?: Problem['io'];
   onCompileStart?: () => void;
   onCompileEnd?: (result: CompileResult) => void;
   onTestStart?: (index: number) => void;
@@ -50,15 +52,9 @@ export class TestRunner {
         const test = opts.tests[i];
         if (!test) continue;
         opts.onTestStart?.(i);
-        const result = await runProcess({
-          command: resolved.run,
-          cwd: path.dirname(opts.file),
-          input: test.input,
-          timeoutMs: hardTimeout(timeLimit),
-          signal,
-        });
-        if (result.aborted) return;
-        opts.onTestEnd?.(i, judgeTest(test, result, timeLimit));
+        const result = await runTest(resolved.run, opts.file, test, timeLimit, opts.io, signal);
+        if (!result) return;
+        opts.onTestEnd?.(i, result);
       }
     } finally {
       if (this.controller === controller) this.controller = undefined;
@@ -68,6 +64,41 @@ export class TestRunner {
   stop(): void {
     this.controller?.abort();
     this.controller = undefined;
+  }
+}
+
+/**
+ * Runs one test; undefined if cancelled. File I/O problems run in a fresh temporary folder
+ * holding the input file, like on the judge, so the solution's folder isn't littered.
+ */
+async function runTest(
+  command: string,
+  file: string,
+  test: TestCase,
+  timeLimit: number,
+  io: Problem['io'],
+  signal: AbortSignal,
+): Promise<TestResult | undefined> {
+  const usesFiles = Boolean(io?.inputFile || io?.outputFile);
+  const cwd = usesFiles ? await fs.mkdtemp(path.join(os.tmpdir(), 'cp-pilot-run-')) : path.dirname(file);
+  try {
+    if (io?.inputFile) await fs.writeFile(path.join(cwd, io.inputFile), test.input);
+    // stdin gets the input too, so solutions that ignore the file still run.
+    const run = await runProcess({ command, cwd, input: test.input, timeoutMs: hardTimeout(timeLimit), signal });
+    if (run.aborted) return undefined;
+    if (!io?.outputFile) return judgeTest(test, run, timeLimit);
+
+    let output: string;
+    try {
+      output = await fs.readFile(path.join(cwd, io.outputFile), 'utf8');
+    } catch {
+      const result = judgeTest(test, run, timeLimit);
+      if (result.verdict === 'TLE' || result.verdict === 'RE') return result;
+      return { ...result, verdict: 'WA', message: `No ${io.outputFile} was written (this problem uses file output)` };
+    }
+    return judgeTest(test, { ...run, stdout: output }, timeLimit);
+  } finally {
+    if (usesFiles) await fs.rm(cwd, { recursive: true, force: true });
   }
 }
 

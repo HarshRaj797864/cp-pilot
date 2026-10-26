@@ -47,7 +47,7 @@
       app.replaceChildren(h('p', { class: 'empty' }, ['Open a solution file to see its tests.']));
       return;
     }
-    const key = `${state.file}|${state.tests.length}|${!!state.problem}|${!!state.cses}`;
+    const key = `${state.file}|${state.tests.length}|${!!state.problem}|${!!state.cses}|${state.browserSubmit}`;
     if (key !== layoutKey) {
       layoutKey = key;
       build();
@@ -77,14 +77,23 @@
       runAll: /** @type {HTMLButtonElement} */ (h('button', { onclick: () => vscode.postMessage({ type: 'runAll' }) }, ['▶ Run all'])),
       stop: /** @type {HTMLButtonElement} */ (h('button', { class: 'secondary', onclick: () => vscode.postMessage({ type: 'stop' }) }, ['■ Stop'])),
       compile: h('div', { class: 'compile' }),
-      submit: /** @type {HTMLButtonElement} */ (h('button', { onclick: () => vscode.postMessage({ type: 'submit' }) }, ['⇪ Submit to CSES'])),
+      submit: /** @type {HTMLButtonElement} */ (
+        h(
+          'button',
+          {
+            onclick: () => vscode.postMessage({ type: 'submit' }),
+            title: state.cses ? 'Submit to CSES and follow the verdict here' : `Open the ${state.browserSubmit} submit page with your code (or file path) on the clipboard`,
+          },
+          [state.cses ? '⇪ Submit to CSES' : `⇪ Submit on ${state.browserSubmit}`],
+        )
+      ),
       account: h('div', { class: 'account' }),
       submission: h('div', { class: 'submission' }),
     };
 
     cards = state.tests.map((/** @type {any} */ _t, /** @type {number} */ i) => buildCard(i));
 
-    const actions = [header.runAll, header.stop, ...(state.cses ? [header.submit] : [])];
+    const actions = [header.runAll, header.stop, ...(state.cses || state.browserSubmit ? [header.submit] : [])];
     app.replaceChildren(
       h('header', {}, [title, meta, h('div', { class: 'actions' }, actions), ...(state.cses ? [header.account] : [])]),
       header.submission,

@@ -16,9 +16,31 @@ export interface Problem {
   /** Megabytes. */
   memoryLimit: number;
   tests: TestCase[];
+  /** File names for problems that use file I/O instead of stdin/stdout (e.g. "input.txt"). */
+  io?: { inputFile?: string; outputFile?: string };
+}
+
+/** Competitive Companion sends a contest as one request per problem, tagged with a shared batch. */
+export interface Batch {
+  id: string;
+  size: number;
 }
 
 export class InvalidProblemError extends Error {}
+
+export function parseBatch(raw: unknown): Batch | undefined {
+  const batch = (raw as { batch?: { id?: unknown; size?: unknown } } | null)?.batch;
+  if (typeof batch?.id !== 'string' || typeof batch.size !== 'number') return undefined;
+  return { id: batch.id, size: batch.size };
+}
+
+function ioFileName(spec: unknown): string | undefined {
+  const s = spec as { type?: unknown; fileName?: unknown } | undefined;
+  if (s?.type !== 'file' || typeof s.fileName !== 'string') return undefined;
+  // A bare file name only: never let a payload point the runner at other paths.
+  const name = s.fileName.trim().split(/[\\/]/).pop();
+  return name && name !== '.' && name !== '..' ? name : undefined;
+}
 
 /**
  * Validates a Competitive Companion payload and converts it into a Problem.
@@ -45,6 +67,9 @@ export function parseCompanionPayload(raw: unknown): Problem {
     return { input: test.input, output: test.output };
   });
 
+  const inputFile = ioFileName(p.input);
+  const outputFile = ioFileName(p.output);
+
   return {
     name: p.name.trim(),
     group: typeof p.group === 'string' ? p.group : '',
@@ -53,5 +78,23 @@ export function parseCompanionPayload(raw: unknown): Problem {
     timeLimit: typeof p.timeLimit === 'number' ? p.timeLimit : 0,
     memoryLimit: typeof p.memoryLimit === 'number' ? p.memoryLimit : 0,
     tests,
+    ...(inputFile || outputFile ? { io: { inputFile, outputFile } } : {}),
   };
+}
+
+/** Whether two problems are the same task: same URL ignoring query/hash/trailing slash, else same name and group. */
+export function isSameProblem(a: Problem, b: Problem): boolean {
+  const ua = normalizeUrl(a.url);
+  const ub = normalizeUrl(b.url);
+  if (ua && ub) return ua === ub;
+  return a.name === b.name && a.group === b.group;
+}
+
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.host.replace(/^www\./, '')}${u.pathname.replace(/\/+$/, '')}`.toLowerCase();
+  } catch {
+    return '';
+  }
 }

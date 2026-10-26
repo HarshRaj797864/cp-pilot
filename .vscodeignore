@@ -10,3 +10,7 @@ tsconfig.json
 vitest.config.*
 .gitignore
 .gitattributes
+CONTRIBUTING.md
+media/icon.svg
+.cph/**
+*.cpp
