@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### AI practice help
+- **✨ Why?** on failing tests: likely bug, the lines involved and a hint, as structured output.
+- **🔍 Stress test**: AI-written generator and brute force (CSES statements fetched automatically; paste one or bring your own brute elsewhere), run through the local judge to find a small failing input; add it as a test in one click.
+- **Contest guard**: AI features are off for live Codeforces and AtCoder contests; other judges ask you to confirm practice.
+- Providers: GitHub Copilot's models through VS Code's Language Model API, or your own Claude API key (Claude Sonnet 5.5 by default, with server-side refusal fallback).
+
 ## 0.1.0 (preview)
 
 First public release.

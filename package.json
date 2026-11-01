@@ -150,6 +150,27 @@
         "command": "cpPilot.cses.openProblem",
         "title": "Open on CSES",
         "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.ai.explainFailure",
+        "title": "AI: Why Did This Test Fail?",
+        "category": "CP Pilot",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "cpPilot.ai.stressTest",
+        "title": "AI: Stress Test Against a Brute Force",
+        "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.ai.setClaudeKey",
+        "title": "AI: Set Claude API Key",
+        "category": "CP Pilot"
+      },
+      {
+        "command": "cpPilot.ai.clearClaudeKey",
+        "title": "AI: Remove Claude API Key",
+        "category": "CP Pilot"
       }
     ],
     "keybindings": [
@@ -250,6 +271,43 @@
           "default": "",
           "description": "Absolute path to a template file whose contents are copied into newly created solution files."
         },
+        "cpPilot.ai.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show the AI features: **✨ Why?** on failing tests and **🔍 Stress test**. They're for practice and upsolving only and are turned off for Codeforces and AtCoder contests that are running."
+        },
+        "cpPilot.ai.provider": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "copilot",
+            "claude"
+          ],
+          "enumDescriptions": [
+            "GitHub Copilot's models if available (no key needed), otherwise your Claude API key.",
+            "Only GitHub Copilot's models.",
+            "Only Claude, with your own API key (CP Pilot: AI: Set Claude API Key)."
+          ],
+          "description": "Which AI the AI features use."
+        },
+        "cpPilot.ai.claudeModel": {
+          "type": "string",
+          "default": "claude-sonnet-5-5",
+          "markdownDescription": "Claude model used with your API key, e.g. `claude-sonnet-5-5` or `claude-opus-5-5`."
+        },
+        "cpPilot.ai.copilotModelFamily": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Preferred Copilot model family (e.g. `claude-sonnet`, `gpt-5`). Empty picks a capable one automatically."
+        },
+        "cpPilot.ai.stressIterations": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 10,
+          "maximum": 5000,
+          "description": "How many random tests a stress test runs (it also stops after one minute)."
+        },
         "cpPilot.openContestProblems": {
           "type": "string",
           "default": "all",
@@ -268,22 +326,52 @@
           "default": {},
           "markdownDescription": "Codeforces compiler id used for one-click submit through [cph-submit](https://github.com/agrawal-d/cph-submit), per file type. Defaults match CPH: `cpp` 91 (G++23), `c` 43, `python` 70 (PyPy 3.10), `java` 87, `rust` 98, `go` 32, `js` 55. Example: `{ \"cpp\": 89 }` for G++20. Ids are the values of the language dropdown on Codeforces' submit page.",
           "propertyNames": {
-            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+            "enum": [
+              "cpp",
+              "c",
+              "python",
+              "java",
+              "rust",
+              "go",
+              "js"
+            ]
           },
-          "additionalProperties": { "type": "integer" }
+          "additionalProperties": {
+            "type": "integer"
+          }
         },
         "cpPilot.cses.languages": {
           "type": "object",
           "default": {},
           "markdownDescription": "Language sent to CSES per file type. By default CSES picks the language from the file extension and uses its default version. Example: `{ \"python\": { \"option\": \"PyPy3\" } }`. Names and options are as shown in CSES's language dropdown.",
           "propertyNames": {
-            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+            "enum": [
+              "cpp",
+              "c",
+              "python",
+              "java",
+              "rust",
+              "go",
+              "js"
+            ]
           },
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "name": { "type": ["string", "null"], "description": "Language name, e.g. \"C++\"." },
-              "option": { "type": ["string", "null"], "description": "Version, e.g. \"C++17\" or \"PyPy3\"." }
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Language name, e.g. \"C++\"."
+              },
+              "option": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Version, e.g. \"C++17\" or \"PyPy3\"."
+              }
             },
             "additionalProperties": false
           }
@@ -293,13 +381,27 @@
           "default": {},
           "markdownDescription": "Override compile/run commands per language. Placeholders: `${file}`, `${exe}`, `${dir}`, `${stem}`. Example: `{ \"cpp\": { \"compile\": \"g++ -std=c++20 -O2 -DLOCAL -o ${exe} ${file}\" } }`",
           "propertyNames": {
-            "enum": ["cpp", "c", "python", "java", "rust", "go", "js"]
+            "enum": [
+              "cpp",
+              "c",
+              "python",
+              "java",
+              "rust",
+              "go",
+              "js"
+            ]
           },
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "compile": { "type": "string", "description": "Compile command (omit for interpreted languages)." },
-              "run": { "type": "string", "description": "Run command." }
+              "compile": {
+                "type": "string",
+                "description": "Compile command (omit for interpreted languages)."
+              },
+              "run": {
+                "type": "string",
+                "description": "Run command."
+              }
             },
             "additionalProperties": false
           }
@@ -319,9 +421,14 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "~1.90.0",
+    "@vscode/codicons": "^0.0.46-24",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "zod": "^4.6.7"
   }
 }

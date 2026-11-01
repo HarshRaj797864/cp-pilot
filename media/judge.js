@@ -10,12 +10,21 @@
   let layoutKey = '';
   /** @type {Card[]} */
   let cards = [];
+  /** Tests the user opened or closed by hand; otherwise passing tests fold and the rest stay open. */
+  const folded = new Map();
+  let wasRunning = false;
 
   /**
-   * @typedef {{ root: HTMLElement, badge: HTMLElement, time: HTMLElement, input: HTMLTextAreaElement,
-   *   expected: HTMLTextAreaElement, received: HTMLElement, receivedOut: HTMLElement, stderr: HTMLElement,
-   *   message: HTMLElement, runBtn: HTMLButtonElement }} Card
+   * @typedef {{ root: HTMLElement, chevron: HTMLElement, pill: HTMLElement, time: HTMLElement,
+   *   input: HTMLTextAreaElement, expected: HTMLTextAreaElement, received: HTMLElement, receivedOut: HTMLElement,
+   *   stderr: HTMLElement, message: HTMLElement, runBtn: HTMLButtonElement, whyBtn: HTMLButtonElement, explain: HTMLElement }} Card
    */
+
+  /**
+   * @type {{ runAll: HTMLButtonElement, stop: HTMLButtonElement, submit: HTMLButtonElement, stressBtn: HTMLButtonElement,
+   *   account: HTMLElement, summary: HTMLElement, compile: HTMLElement, submission: HTMLElement, stress: HTMLElement }}
+   */
+  let header;
 
   window.addEventListener('message', (e) => {
     if (e.data.type === 'state') {
@@ -24,6 +33,8 @@
     }
   });
   vscode.postMessage({ type: 'ready' });
+
+  // ---------- helpers ----------
 
   /**
    * @param {string} tag
@@ -41,123 +52,183 @@
     return el;
   }
 
+  /** @param {string} name */
+  const icon = (name) => h('i', { class: `codicon codicon-${name}`, 'aria-hidden': 'true' });
+
+  /** @param {string} type @param {Record<string, unknown>} [extra] */
+  function post(type, extra = {}) {
+    vscode.postMessage({ type, ...extra });
+  }
+
+  /** A text link that posts a message. @param {string} text @param {string} type @param {Record<string, unknown>} [extra] */
+  function action(text, type, extra) {
+    return h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); post(type, extra); } }, [text]);
+  }
+
+  /** @param {string} label @param {string} iconName @param {() => void} onclick @param {string} [cls] @param {string} [title] */
+  function button(label, iconName, onclick, cls = '', title = '') {
+    return /** @type {HTMLButtonElement} */ (h('button', { class: `btn ${cls}`, title: title || label, onclick }, [icon(iconName), ...(label ? [h('span', {}, [label])] : [])]));
+  }
+
+  /** @param {string} iconName @param {string} title @param {(e: Event) => void} onclick */
+  function iconButton(iconName, title, onclick) {
+    return /** @type {HTMLButtonElement} */ (h('button', { class: 'icon-btn', title, 'aria-label': title, onclick }, [icon(iconName)]));
+  }
+
+  // ---------- layout ----------
+
   function render() {
     if (!state.file) {
       layoutKey = '';
-      app.replaceChildren(h('p', { class: 'empty' }, ['Open a solution file to see its tests.']));
+      app.replaceChildren(
+        h('div', { class: 'empty' }, [icon('beaker'), h('p', {}, ['Open a solution file to see its tests.']), h('p', { class: 'muted' }, ['Import a problem with Competitive Companion, or add tests by hand.'])]),
+      );
       return;
     }
-    const key = `${state.file}|${state.tests.length}|${!!state.problem}|${!!state.cses}|${state.browserSubmit}`;
+    const key = `${state.file}|${state.tests.length}|${!!state.problem}|${!!state.cses}|${state.browserSubmit}|${!!state.ai}`;
     if (key !== layoutKey) {
       layoutKey = key;
+      folded.clear();
       build();
     }
+    // A new run resets hand-folded tests so results unfold the failures again.
+    if (state.running && !wasRunning) folded.clear();
+    wasRunning = state.running;
     update();
   }
 
-  /**
-   * @type {{ runAll: HTMLButtonElement, stop: HTMLButtonElement, compile: HTMLElement,
-   *   submit: HTMLButtonElement, account: HTMLElement, submission: HTMLElement }}
-   */
-  let header;
-
   function build() {
     const p = state.problem;
-    const title = p
-      ? p.url
-        ? h('a', { href: p.url, class: 'title', title: p.url }, [p.name])
-        : h('span', { class: 'title' }, [p.name])
-      : h('span', { class: 'title' }, [state.file]);
-    const meta = h('div', { class: 'meta' }, [
-      p ? `${state.file} · ${p.timeLimit} ms` : 'No tests yet',
-      ...(p && p.interactive ? [' · interactive (not judged locally)'] : []),
-    ]);
+    const title = p && p.url
+      ? h('a', { href: p.url, class: 'title', title: `Open ${p.url}` }, [p.name])
+      : h('span', { class: 'title' }, [p ? p.name : state.file]);
+    const metaParts = p ? [state.file, `${p.timeLimit} ms`] : ['No tests yet'];
+    if (p && p.interactive) metaParts.push('interactive');
 
+    const submitLabel = state.cses ? 'Submit' : state.browserSubmit ? 'Submit' : '';
     header = {
-      runAll: /** @type {HTMLButtonElement} */ (h('button', { onclick: () => vscode.postMessage({ type: 'runAll' }) }, ['▶ Run all'])),
-      stop: /** @type {HTMLButtonElement} */ (h('button', { class: 'secondary', onclick: () => vscode.postMessage({ type: 'stop' }) }, ['■ Stop'])),
-      compile: h('div', { class: 'compile' }),
-      submit: /** @type {HTMLButtonElement} */ (
-        h(
-          'button',
-          {
-            onclick: () => vscode.postMessage({ type: 'submit' }),
-            title: state.cses ? 'Submit to CSES and follow the verdict here' : `Open the ${state.browserSubmit} submit page with your code (or file path) on the clipboard`,
-          },
-          [state.cses ? '⇪ Submit to CSES' : `⇪ Submit on ${state.browserSubmit}`],
-        )
+      runAll: button('Run all', 'play', () => post('runAll'), 'primary', 'Run all tests (Ctrl+Alt+R)'),
+      stop: button('Stop', 'debug-stop', () => post('stop'), 'secondary'),
+      submit: button(
+        submitLabel,
+        'cloud-upload',
+        () => post('submit'),
+        'secondary',
+        state.cses ? 'Submit to CSES and follow the verdict here' : `Submit on ${state.browserSubmit}`,
       ),
-      account: h('div', { class: 'account' }),
-      submission: h('div', { class: 'submission' }),
+      stressBtn: button('Stress', 'beaker', () => post('stress'), 'secondary', 'Stress test: compare with a brute force on random small tests (AI)'),
+      account: h('div', { class: 'account muted' }),
+      summary: h('div', { class: 'summary' }),
+      compile: h('div', { class: 'notice' }),
+      submission: h('div', { class: 'panel-card' }),
+      stress: h('div', { class: 'panel-card ai' }),
     };
 
     cards = state.tests.map((/** @type {any} */ _t, /** @type {number} */ i) => buildCard(i));
 
-    const actions = [header.runAll, header.stop, ...(state.cses || state.browserSubmit ? [header.submit] : [])];
+    const toolbar = [header.runAll, header.stop];
+    if (state.cses || state.browserSubmit) toolbar.push(header.submit);
+    if (state.ai) toolbar.push(header.stressBtn);
+
     app.replaceChildren(
-      h('header', {}, [title, meta, h('div', { class: 'actions' }, actions), ...(state.cses ? [header.account] : [])]),
-      header.submission,
+      h('header', {}, [
+        title,
+        h('div', { class: 'meta muted' }, [metaParts.join(' · ')]),
+        h('div', { class: 'toolbar' }, toolbar),
+        ...(state.cses ? [header.account] : []),
+      ]),
+      header.summary,
       header.compile,
-      ...cards.map((c) => c.root),
-      h('button', { class: 'secondary add', onclick: () => vscode.postMessage({ type: 'addTest' }) }, ['+ Add test']),
+      header.submission,
+      header.stress,
+      h('div', { class: 'tests' }, cards.map((c) => c.root)),
+      h('button', { class: 'add-test', onclick: () => post('addTest') }, [icon('add'), h('span', {}, ['Add test'])]),
     );
   }
 
   /** @param {number} index */
   function buildCard(index) {
-    const save = () =>
-      vscode.postMessage({ type: 'updateTest', index, input: card.input.value, output: card.expected.value });
+    const save = () => post('updateTest', { index, input: card.input.value, output: card.expected.value });
     const textarea = () => {
       const el = /** @type {HTMLTextAreaElement} */ (h('textarea', { spellcheck: 'false', onchange: save }));
       el.addEventListener('input', () => autosize(el));
       return el;
     };
+    const stop = (/** @type {() => void} */ fn) => (/** @type {Event} */ e) => { e.stopPropagation(); fn(); };
 
     /** @type {Card} */
     const card = {
-      root: h('section', { class: 'card' }),
-      badge: h('span', { class: 'badge' }),
-      time: h('span', { class: 'time' }),
+      root: h('section', { class: 'test' }),
+      chevron: icon('chevron-down'),
+      pill: h('span', { class: 'pill' }),
+      time: h('span', { class: 'time muted' }),
       input: textarea(),
       expected: textarea(),
-      received: h('div', { class: 'received' }),
-      receivedOut: h('pre'),
-      stderr: h('pre', { class: 'stderr' }),
-      message: h('div', { class: 'message' }),
-      runBtn: /** @type {HTMLButtonElement} */ (h('button', { class: 'icon', title: 'Run this test', onclick: () => vscode.postMessage({ type: 'run', index }) }, ['▶'])),
+      received: h('div', { class: 'field' }),
+      receivedOut: h('pre', { class: 'io' }),
+      stderr: h('pre', { class: 'io stderr' }),
+      message: h('div', { class: 'message muted' }),
+      runBtn: iconButton('play', 'Run this test', stop(() => post('run', { index }))),
+      whyBtn: /** @type {HTMLButtonElement} */ (
+        h('button', { class: 'why', title: 'Ask AI why this test fails (practice only)', onclick: stop(() => post('explain', { index })) }, [icon('sparkle'), h('span', {}, ['Why?'])])
+      ),
+      explain: h('div', { class: 'ai-card' }),
     };
     card.received.append(h('label', {}, ['Received']), card.receivedOut, card.message, card.stderr);
+
+    const row = h('div', { class: 'test-row', role: 'button', tabindex: '0', title: 'Show or hide this test' }, [
+      card.chevron,
+      h('span', { class: 'test-name' }, [`Test ${index + 1}`]),
+      card.pill,
+      card.time,
+      h('span', { class: 'spacer' }),
+      card.whyBtn,
+      card.runBtn,
+      iconButton('trash', 'Delete test', stop(() => post('deleteTest', { index }))),
+    ]);
+    const toggle = () => {
+      folded.set(index, !isFolded(index));
+      update();
+    };
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    });
+
     card.root.append(
-      h('div', { class: 'card-head' }, [
-        h('span', { class: 'name' }, [`Test ${index + 1}`]),
-        card.badge,
-        card.time,
-        h('span', { class: 'spacer' }),
-        card.runBtn,
-        h('button', { class: 'icon', title: 'Delete test', onclick: () => vscode.postMessage({ type: 'deleteTest', index }) }, ['✕']),
+      row,
+      h('div', { class: 'test-body' }, [
+        h('div', { class: 'field' }, [h('label', {}, ['Input']), card.input]),
+        h('div', { class: 'field' }, [h('label', {}, ['Expected']), card.expected]),
+        card.received,
+        card.explain,
       ]),
-      h('label', {}, ['Input']),
-      card.input,
-      h('label', {}, ['Expected output']),
-      card.expected,
-      card.received,
     );
     return card;
   }
+
+  /** Passing tests fold by default; everything else stays open unless the user folded it. @param {number} i */
+  function isFolded(i) {
+    if (folded.has(i)) return folded.get(i);
+    const r = state.results[i];
+    return Boolean(r && r !== 'running' && r.verdict === 'AC');
+  }
+
+  // ---------- updates ----------
 
   function update() {
     if (!header) return;
     header.runAll.disabled = state.running || state.tests.length === 0;
     header.stop.hidden = !state.running;
+    header.runAll.hidden = state.running;
 
-    const c = state.compile;
-    header.compile.className = `compile ${c.status}`;
-    header.compile.replaceChildren(
-      ...(c.status === 'compiling' ? ['Compiling…'] : []),
-      ...(c.status === 'error' ? [h('strong', {}, ['Compilation error']), h('pre', {}, [c.output])] : []),
-    );
-
+    updateSummary();
+    updateCompile();
     updateCses();
+    updateStress();
 
     cards.forEach((card, i) => {
       const test = state.tests[i];
@@ -166,15 +237,19 @@
       if (document.activeElement !== card.expected) setValue(card.expected, test.output);
 
       const r = state.results[i];
+      const fold = isFolded(i);
+      card.root.classList.toggle('folded', fold);
+      card.chevron.className = `codicon codicon-chevron-${fold ? 'right' : 'down'}`;
       card.runBtn.disabled = state.running;
+
       if (r === 'running') {
-        card.root.className = 'card running';
-        card.badge.textContent = 'Running…';
+        card.root.dataset.verdict = 'running';
+        card.pill.textContent = 'running';
         card.time.textContent = '';
         card.received.hidden = true;
       } else if (r) {
-        card.root.className = `card verdict-${r.verdict}`;
-        card.badge.textContent = r.verdict;
+        card.root.dataset.verdict = r.verdict;
+        card.pill.textContent = r.verdict;
         card.time.textContent = `${r.timeMs} ms`;
         card.received.hidden = false;
         card.receivedOut.textContent = r.stdout || '(empty)';
@@ -183,58 +258,191 @@
         card.stderr.textContent = r.stderr;
         card.stderr.hidden = !r.stderr;
       } else {
-        card.root.className = 'card';
-        card.badge.textContent = '';
+        delete card.root.dataset.verdict;
+        card.pill.textContent = '';
         card.time.textContent = '';
         card.received.hidden = true;
       }
+      card.pill.hidden = !card.pill.textContent;
+
+      const failed = r && r !== 'running' && r.verdict !== 'AC';
+      const explanation = state.ai && failed ? state.ai.explanations[i] : null;
+      card.whyBtn.hidden = !state.ai || !failed;
+      card.whyBtn.disabled = Boolean(explanation && explanation.status === 'loading');
+      renderExplanation(card.explain, explanation);
     });
+  }
+
+  function updateSummary() {
+    const done = state.results.filter((/** @type {any} */ r) => r && r !== 'running');
+    header.summary.hidden = done.length === 0 && !state.running;
+    if (header.summary.hidden) return;
+    const passed = done.filter((/** @type {any} */ r) => r.verdict === 'AC').length;
+    const total = state.tests.length;
+    const text = state.running ? `Running… ${done.length} / ${total}` : `${passed} / ${total} passed`;
+    header.summary.className = `summary ${!state.running && done.length === total && passed === total ? 'all-pass' : ''}`;
+    header.summary.replaceChildren(
+      h('span', { class: 'summary-text' }, [text]),
+      h(
+        'span',
+        { class: 'dots' },
+        state.results.map((/** @type {any} */ r, /** @type {number} */ i) =>
+          h('span', { class: 'dot', 'data-verdict': r === 'running' ? 'running' : r ? r.verdict : 'none', title: `Test ${i + 1}${r && r !== 'running' ? `: ${r.verdict}` : ''}` }),
+        ),
+      ),
+    );
+  }
+
+  function updateCompile() {
+    const c = state.compile;
+    header.compile.hidden = c.status !== 'compiling' && c.status !== 'error';
+    if (c.status === 'compiling') {
+      header.compile.className = 'notice';
+      header.compile.replaceChildren(icon('loading codicon-modifier-spin'), h('span', {}, ['Compiling…']));
+    } else if (c.status === 'error') {
+      header.compile.className = 'notice error';
+      header.compile.replaceChildren(
+        h('details', { open: '' }, [h('summary', {}, [icon('error'), h('span', {}, ['Compilation error'])]), h('pre', { class: 'io' }, [c.output])]),
+      );
+    }
   }
 
   function updateCses() {
     const cses = state.cses;
     header.submission.hidden = !cses || !cses.submission;
+    header.submit.disabled = Boolean(cses && cses.submitting);
     if (!cses) return;
 
-    header.submit.disabled = cses.submitting;
-    const link = (/** @type {string} */ text, /** @type {string} */ type) =>
-      h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); vscode.postMessage({ type }); } }, [text]);
     header.account.replaceChildren(
-      ...(cses.user
-        ? [`CSES: ${cses.user} · `, link('Log out', 'csesLogout')]
-        : ['CSES: not logged in · ', link('Log in', 'csesLogin')]),
+      ...(cses.user ? [`CSES · ${cses.user} · `, action('Log out', 'csesLogout')] : ['CSES · not logged in · ', action('Log in', 'csesLogin')]),
     );
 
     const s = cses.submission;
-    if (!s) return;
-    header.submission.className = `submission ${s.outcome}`;
+    if (!s || unchanged(header.submission, { s, submitting: cses.submitting })) return;
+    header.submission.className = `panel-card submission ${s.outcome}`;
     const id = s.id;
     const tests = /** @type {{ number: number, verdict: string, timeMs: number | null }[]} */ (s.tests || []);
     header.submission.replaceChildren(
-      h('div', { class: 'submission-head' }, [
+      h('div', { class: 'card-head' }, [
+        icon(s.outcome === 'accepted' ? 'pass-filled' : s.outcome === 'pending' ? 'loading codicon-modifier-spin' : 'error'),
         h('strong', {}, [s.summary]),
-        h('span', { class: 'submission-links' }, [
-          ...(cses.submitting ? [link('Stop waiting', 'cancelSubmit'), ' '] : []),
-          ...(id
-            ? [h('a', { href: '#', onclick: (/** @type {Event} */ e) => { e.preventDefault(); vscode.postMessage({ type: 'openSubmission', id }); } }, [`#${id}`])]
-            : []),
-        ]),
+        h('span', { class: 'spacer' }),
+        ...(cses.submitting ? [action('Stop waiting', 'cancelSubmit')] : []),
+        ...(id ? [action(`#${id}`, 'openSubmission', { id })] : []),
       ]),
       ...(tests.length
         ? [
             h(
               'div',
-              { class: 'chips' },
-              tests.map((t) =>
-                h('span', { class: `chip v-${t.verdict}`, title: `Test ${t.number}: ${t.verdict}${t.timeMs !== null ? `, ${t.timeMs} ms` : ''}` }, [
-                  String(t.number),
-                ]),
+              { class: 'dots' },
+              tests.map((t) => h('span', { class: 'dot', 'data-verdict': t.verdict, title: `Test ${t.number}: ${t.verdict}${t.timeMs !== null ? `, ${t.timeMs} ms` : ''}` })),
+            ),
+          ]
+        : []),
+      ...(s.compiler ? [h('pre', { class: 'io' }, [s.compiler])] : []),
+    );
+  }
+
+  /**
+   * True when `box` already shows `data`, so it isn't rebuilt: rebuilding on every state update
+   * would reset things the user toggled inside it (like an opened hint).
+   * @param {HTMLElement} box @param {unknown} data
+   */
+  function unchanged(box, data) {
+    const key = JSON.stringify(data ?? null);
+    if (box.dataset.key === key) return true;
+    box.dataset.key = key;
+    return false;
+  }
+
+  /** @param {HTMLElement} box @param {any} x the ExplainState, or null to hide */
+  function renderExplanation(box, x) {
+    box.hidden = !x;
+    if (unchanged(box, x)) return;
+    if (!x) return box.replaceChildren();
+    const head = (/** @type {(Node|string)[]} */ ...rest) => h('div', { class: 'card-head' }, [icon('sparkle'), h('span', { class: 'ai-label' }, ['AI']), ...rest]);
+    if (x.status === 'loading') {
+      box.className = 'ai-card loading';
+      return box.replaceChildren(head(h('span', { class: 'muted' }, ['Looking at this test…']), h('span', { class: 'spacer' }), icon('loading codicon-modifier-spin')));
+    }
+    if (x.status === 'error') {
+      box.className = 'ai-card error';
+      return box.replaceChildren(head(h('span', { class: 'muted' }, ["Couldn't explain this test"])), h('p', {}, [x.message]));
+    }
+    const d = x.diagnosis;
+    const hint = h('p', { class: 'hint', hidden: '' }, [d.hint]);
+    const hintToggle = h('a', { href: '#', class: 'hint-toggle' }, [icon('lightbulb'), h('span', {}, ['Show hint'])]);
+    hintToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      hint.hidden = !hint.hidden;
+      /** @type {HTMLElement} */ (hintToggle.lastChild).textContent = hint.hidden ? 'Show hint' : 'Hide hint';
+    });
+    box.className = 'ai-card';
+    box.replaceChildren(
+      head(h('span', { class: 'spacer' }), h('span', { class: `confidence c-${d.confidence}`, title: 'How sure the AI is' }, [`${d.confidence} confidence`])),
+      h('p', { class: 'ai-summary' }, [d.summary]),
+      h('p', { class: 'muted-text' }, [d.cause]),
+      ...(d.lines.length
+        ? [
+            h(
+              'ul',
+              { class: 'ai-lines' },
+              d.lines.map((/** @type {{ line: number, why: string }} */ l) =>
+                h('li', {}, [h('a', { href: '#', class: 'line-chip', onclick: (/** @type {Event} */ e) => { e.preventDefault(); post('revealLine', { line: l.line }); } }, [`L${l.line}`]), h('span', {}, [l.why])]),
               ),
             ),
           ]
         : []),
-      ...(s.compiler ? [h('pre', {}, [s.compiler])] : []),
+      hintToggle,
+      hint,
+      h('div', { class: 'footnote muted' }, [`${x.by} · AI can be wrong`]),
     );
+  }
+
+  function updateStress() {
+    const ai = state.ai;
+    const s = ai && ai.stress;
+    header.stressBtn.disabled = !ai || !ai.canStress || Boolean(s && (s.status === 'running' || s.status === 'preparing'));
+    header.stress.hidden = !s;
+    if (unchanged(header.stress, s)) return;
+    if (!s) return header.stress.replaceChildren();
+    header.stress.className = `panel-card ai stress-${s.status}`;
+    const head = (/** @type {string} */ iconName, /** @type {(Node|string)[]} */ ...rest) => h('div', { class: 'card-head' }, [icon(iconName), ...rest]);
+    const io = (/** @type {string} */ label, /** @type {string} */ text) => h('div', { class: 'field' }, [h('label', {}, [label]), h('pre', { class: 'io' }, [text || '(empty)'])]);
+    const programs = action('View programs', 'openStressPrograms');
+
+    switch (s.status) {
+      case 'preparing':
+        return header.stress.replaceChildren(head('loading codicon-modifier-spin', h('span', {}, [s.message])));
+      case 'running':
+        return header.stress.replaceChildren(
+          head('beaker', h('strong', {}, ['Stress testing']), h('span', { class: 'muted' }, [`${s.done} / ${s.total}`]), h('span', { class: 'spacer' }), action('Stop', 'stopStress')),
+          h('div', { class: 'bar' }, [h('div', { class: 'bar-fill', style: `width:${Math.round((100 * s.done) / Math.max(1, s.total))}%` })]),
+        );
+      case 'found':
+        return header.stress.replaceChildren(
+          head('bug', h('strong', {}, ['Found a failing test']), h('span', { class: 'pill', 'data-verdict': s.verdict }, [s.verdict]), h('span', { class: 'spacer' }), programs),
+          ...(s.message ? [h('p', { class: 'muted-text' }, [s.message])] : []),
+          io('Input', s.input),
+          h('div', { class: 'two-col' }, [io('Brute force', s.expected), io('Yours', s.received)]),
+          s.added
+            ? h('p', { class: 'muted-text' }, ['Added as a test below. Run it, then ask Why?'])
+            : button('Add as test', 'add', () => post('addCounterexample'), 'primary'),
+        );
+      case 'passed':
+        return header.stress.replaceChildren(
+          head('pass', h('strong', {}, [`Passed ${s.iterations} random tests`]), h('span', { class: 'spacer' }), programs),
+          h('p', { class: 'muted-text' }, ['Same answers as the brute force on small inputs. Large inputs and time limits aren’t covered.']),
+        );
+      case 'stopped':
+        return header.stress.replaceChildren(head('debug-stop', h('span', {}, [`Stopped after ${s.iterations} tests`])));
+      case 'error':
+        return header.stress.replaceChildren(
+          head('warning', h('strong', {}, ['Stress test failed'])),
+          h('p', { class: 'muted-text pre-wrap' }, [s.message]),
+          ...(s.canOpenPrograms ? [programs] : []),
+        );
+    }
   }
 
   /** @param {HTMLTextAreaElement} el @param {string} value */
@@ -245,6 +453,6 @@
 
   /** @param {HTMLTextAreaElement} el */
   function autosize(el) {
-    el.rows = Math.min(Math.max(el.value.split('\n').length, 2), 12);
+    el.rows = Math.min(Math.max(el.value.split('\n').length, 1), 12);
   }
 })();

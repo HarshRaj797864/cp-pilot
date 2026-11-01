@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { AiAssistant } from './ai/assistant';
 import { CPH_SUBMIT_PORT, CphSubmitQueue } from './companion/cphSubmit';
 import { CompanionServer } from './companion/server';
 import { CsesApi } from './cses/api';
@@ -21,11 +22,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const csesApi = new CsesApi();
   const csesAuth = new CsesAuth(context.secrets, csesApi);
   const cphSubmitQueue = new CphSubmitQueue();
-  const judge = new JudgeViewProvider(context.extensionUri, csesApi, csesAuth, {
-    queue: cphSubmitQueue,
-    // cph-submit only ever polls CPH's port.
-    available: () => server?.port === CPH_SUBMIT_PORT,
-  });
+  const assistant = new AiAssistant(context.secrets);
+  const judge = new JudgeViewProvider(
+    context.extensionUri,
+    csesApi,
+    csesAuth,
+    {
+      queue: cphSubmitQueue,
+      // cph-submit only ever polls CPH's port.
+      available: () => server?.port === CPH_SUBMIT_PORT,
+    },
+    assistant,
+  );
   const problems = new CsesProblemsProvider(context.globalState, csesApi, csesAuth);
   const problemsView = vscode.window.createTreeView(CsesProblemsProvider.viewId, { treeDataProvider: problems });
   problems.attach(problemsView);
@@ -49,6 +57,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     problems,
     problemsView,
     judge.onDidAccept((taskId) => problems.markSolved(taskId)),
+    vscode.commands.registerCommand('cpPilot.ai.explainFailure', () => judge.ai.explain()),
+    vscode.commands.registerCommand('cpPilot.ai.stressTest', () => judge.ai.stress()),
+    vscode.commands.registerCommand('cpPilot.ai.setClaudeKey', () => assistant.setClaudeKey()),
+    vscode.commands.registerCommand('cpPilot.ai.clearClaudeKey', () => assistant.clearClaudeKey()),
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('cpPilot.ai.enabled')) void judge.refresh();
+    }),
     vscode.commands.registerCommand('cpPilot.cses.refreshProblems', () => problems.refresh()),
     vscode.commands.registerCommand('cpPilot.cses.searchProblems', () => problems.search()),
     vscode.commands.registerCommand('cpPilot.cses.clearSearch', () => problems.clearSearch()),
