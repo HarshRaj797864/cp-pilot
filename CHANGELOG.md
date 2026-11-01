@@ -1,12 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (preview)
 
 ### AI practice help
-- **✨ Why?** on failing tests: likely bug, the lines involved and a hint, as structured output.
-- **🔍 Stress test**: AI-written generator and brute force (CSES statements fetched automatically; paste one or bring your own brute elsewhere), run through the local judge to find a small failing input; add it as a test in one click.
-- **Contest guard**: AI features are off for live Codeforces and AtCoder contests; other judges ask you to confirm practice.
-- Providers: GitHub Copilot's models through VS Code's Language Model API, or your own Claude API key (Claude Sonnet 5.5 by default, with server-side refusal fallback).
+- **✨ Why?** on failing tests: the likely bug, links to the lines involved, and a hint you can reveal (not a rewritten solution).
+- **🔍 Stress test**: an AI-written generator and brute force run against your solution through the local judge until they disagree, then the small failing input can be added as a test in one click. CSES statements are fetched automatically; elsewhere paste the statement or bring your own brute force.
+- **Contest guard**: AI features are off while a Codeforces or AtCoder contest is running; for other judges you confirm it's practice.
+- Works with **GitHub Copilot** (no key; free for students) or **your own Claude API key** (Claude Sonnet 5.5 by default). If a Copilot model isn't available to extensions, the next one is used.
+
+### Judge panel
+- Cleaner design: VS Code icons, a pass summary with one dot per test, passing tests folded to a single line, verdict pills, and a collapsible compile error.
+
+### Fixes
+- Clearer message when VS Code's own AI features are switched off.
+- AI answers are shown as plain text instead of raw LaTeX.
 
 ## 0.1.0 (preview)
 
