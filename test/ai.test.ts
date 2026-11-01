@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClaudeProvider } from '../src/ai/claude';
+import { orderModels } from '../src/ai/modelOrder';
 import { DIAGNOSE_SYSTEM, clip, diagnosePrompt, numberLines, stressPrompt } from '../src/ai/prompts';
 import { AiError, extractJson, parseStructured } from '../src/ai/provider';
 import { Diagnosis, StressPrograms } from '../src/ai/schemas';
@@ -130,5 +131,19 @@ describe('ClaudeProvider', () => {
     const api = fakeApi({ status: 401, body: { type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } } });
     const provider = new ClaudeProvider('bad', undefined, api.fetchImpl);
     await expect(provider.generate({ system: '', prompt: '', schema: Diagnosis })).rejects.toThrow(/Set Claude API Key/);
+  });
+});
+
+describe('orderModels (Copilot fallback order)', () => {
+  it('tries the last working model, then preferences, then the rest in Copilot order', () => {
+    const models = [
+      { id: 'a', family: 'gpt-5.6-luna' },
+      { id: 'b', family: 'o-mini' },
+      { id: 'c', family: 'claude-sonnet-5' },
+      { id: 'd', family: 'gpt-4.1' },
+    ];
+    expect(orderModels(models, '').map((m) => m.id)).toEqual(['c', 'a', 'd', 'b']);
+    expect(orderModels(models, 'gpt-4.1').map((m) => m.id)).toEqual(['d', 'c', 'a', 'b']);
+    expect(orderModels(models, '', 'b').map((m) => m.id)).toEqual(['b', 'c', 'a', 'd']);
   });
 });

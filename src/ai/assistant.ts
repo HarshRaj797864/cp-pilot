@@ -95,21 +95,33 @@ export class AiAssistant {
     const setting = config.get<ProviderSetting>('provider', 'auto');
     const model = config.get<string>('claudeModel', DEFAULT_CLAUDE_MODEL) || DEFAULT_CLAUDE_MODEL;
 
+    // VS Code's own switch hides Copilot from extensions too; say so instead of "install Copilot".
+    const aiDisabledInVsCode = vscode.workspace.getConfiguration('chat').get<boolean>('disableAIFeatures', false);
     if (setting !== 'claude') {
       const copilot = await CopilotProvider.create(config.get<string>('copilotModelFamily', ''));
       if (copilot) return copilot;
-      if (setting === 'copilot') throw new AiError('No GitHub Copilot models are available. Install and sign in to Copilot, or switch cpPilot.ai.provider.');
+      if (setting === 'copilot') {
+        throw new AiError(
+          aiDisabledInVsCode
+            ? 'VS Code\'s AI features are turned off ("Chat: Disable AI Features"). Turn them on and sign in to Copilot.'
+            : 'No GitHub Copilot models are available. Sign in to Copilot in VS Code, or switch cpPilot.ai.provider.',
+        );
+      }
     }
 
     let key = await this.secrets.get(KEY_SECRET);
     if (!key) {
+      const copilotAction = aiDisabledInVsCode ? 'Turn On AI Features' : 'Set Up Copilot';
       const choice = await vscode.window.showInformationMessage(
-        'AI features need GitHub Copilot or your own Claude API key.',
+        aiDisabledInVsCode
+          ? 'AI features need GitHub Copilot or a Claude API key, but VS Code\'s AI features are turned off ("Chat: Disable AI Features").'
+          : 'AI features need GitHub Copilot (sign in to Copilot in VS Code) or your own Claude API key.',
         'Set Claude API Key',
-        'Get Copilot',
+        copilotAction,
       );
-      if (choice === 'Get Copilot') {
-        void vscode.env.openExternal(vscode.Uri.parse('https://github.com/features/copilot'));
+      if (choice === copilotAction) {
+        if (aiDisabledInVsCode) void vscode.commands.executeCommand('workbench.action.openSettings', 'chat.disableAIFeatures');
+        else void vscode.commands.executeCommand('workbench.action.chat.open');
       } else if (choice === 'Set Claude API Key') {
         await this.setClaudeKey();
         key = await this.secrets.get(KEY_SECRET);
