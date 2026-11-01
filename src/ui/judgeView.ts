@@ -12,12 +12,14 @@ import { prepareSubmitFile, shortVerdict } from '../cses/files';
 import { browserSubmitTarget } from '../core/submitLinks';
 import { browserVisiblePath } from '../core/hostPath';
 import { CPH_SUBMIT_PORT, CphSubmitQueue, codeforcesProblemName } from '../companion/cphSubmit';
-
-/** cph-submit polls every 3 s; give it a few rounds, e.g. while the browser wakes up. */
-const CPH_SUBMIT_WAIT_MS = 12_000;
 import { Language } from '../core/naming';
 import { submitAndWait } from '../cses/submitter';
 import { getCodeforcesLanguageId, getCsesLanguage, getLanguageCommands } from '../workspace/settings';
+import { AiAssistant } from '../ai/assistant';
+import { AiFeatures, ExplainState, StressState } from './aiFeatures';
+
+/** cph-submit polls every 3 s; give it a few rounds, e.g. while the browser wakes up. */
+const CPH_SUBMIT_WAIT_MS = 12_000;
 
 type ResultSlot = TestResult | 'running' | null;
 type CompileState = { status: 'idle' | 'compiling' | 'ok' } | { status: 'error'; output: string };
@@ -37,6 +39,9 @@ interface FileState {
   results: ResultSlot[];
   compile: CompileState;
   submission?: SubmissionState;
+  /** AI "Why?" answers, by test index; cleared when that test is re-run or edited. */
+  explanations: (ExplainState | undefined)[];
+  stress?: StressState;
 }
 
 type Message =
@@ -51,7 +56,13 @@ type Message =
   | { type: 'cancelSubmit' }
   | { type: 'csesLogin' }
   | { type: 'csesLogout' }
-  | { type: 'openSubmission'; id: number };
+  | { type: 'openSubmission'; id: number }
+  | { type: 'explain'; index: number }
+  | { type: 'revealLine'; line: number }
+  | { type: 'stress' }
+  | { type: 'stopStress' }
+  | { type: 'addCounterexample' }
+  | { type: 'openStressPrograms' };
 
 export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewId = 'cpPilot.judge';
@@ -69,13 +80,37 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   /** Fires with the CSES task id when a submission is accepted. */
   readonly onDidAccept = this.accepted.event;
   private readonly disposables: vscode.Disposable[] = [this.accepted];
+  /** AI explain and stress-test features, driven from the panel and commands. */
+  readonly ai: AiFeatures;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly csesApi: CsesApi,
     private readonly csesAuth: CsesAuth,
     private readonly cphSubmit: { queue: CphSubmitQueue; available: () => boolean },
+    private readonly assistant: AiAssistant,
   ) {
+    this.ai = new AiFeatures(assistant, {
+      current: () => {
+        const language = this.file && languageFromPath(this.file);
+        return this.file && this.problem && language ? { file: this.file, problem: this.problem, language } : undefined;
+      },
+      results: (file) => this.stateFor(file).results,
+      setExplanation: (file, index, s) => {
+        const state = this.stateFor(file);
+        this.update(file, () => (state.explanations[index] = s));
+      },
+      setStress: (file, s) => {
+        const state = this.stateFor(file);
+        this.update(file, () => (state.stress = s));
+      },
+      stressState: (file) => this.stateFor(file).stress,
+      addTest: async (file, test) => {
+        if (file !== this.file) return;
+        await this.editTests((tests) => tests.push(test));
+      },
+      reveal: () => this.reveal(),
+    });
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor((e) => this.onEditorChanged(e)),
       csesAuth.onDidChange((user) => {
@@ -304,7 +339,10 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     const state = this.stateFor(file);
     const targets = indices ?? problem.tests.map((_, i) => i);
     state.results.length = problem.tests.length;
-    for (const i of targets) state.results[i] = null;
+    for (const i of targets) {
+      state.results[i] = null;
+      state.explanations[i] = undefined;
+    }
     this.runningFile = file;
     const runId = ++this.runId;
     this.postState();
@@ -372,15 +410,29 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       case 'addTest':
         return this.editTests((tests) => tests.push({ input: '', output: '' }));
       case 'deleteTest':
-        return this.editTests((tests, results) => {
+        return this.editTests((tests, results, explanations) => {
           tests.splice(m.index, 1);
           results.splice(m.index, 1);
+          explanations.splice(m.index, 1);
         });
       case 'updateTest':
-        return this.editTests((tests, results) => {
+        return this.editTests((tests, results, explanations) => {
           tests[m.index] = { input: m.input, output: m.output };
           results[m.index] = null;
+          explanations[m.index] = undefined;
         });
+      case 'explain':
+        return this.ai.explain(m.index);
+      case 'revealLine':
+        return this.ai.revealLine(m.line);
+      case 'stress':
+        return this.ai.stress();
+      case 'stopStress':
+        return this.ai.stopStress();
+      case 'addCounterexample':
+        return this.ai.addCounterexample();
+      case 'openStressPrograms':
+        return this.ai.openStressPrograms();
       case 'submit':
         return this.submit();
       case 'cancelSubmit':
@@ -396,7 +448,9 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     }
   }
 
-  private async editTests(edit: (tests: Problem['tests'], results: ResultSlot[]) => void): Promise<void> {
+  private async editTests(
+    edit: (tests: Problem['tests'], results: ResultSlot[], explanations: (ExplainState | undefined)[]) => void,
+  ): Promise<void> {
     const file = this.file;
     if (!file) return;
     if (this.runningFile === file) this.stop();
@@ -410,7 +464,8 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
       memoryLimit: 0,
       tests: [],
     };
-    edit(problem.tests, this.stateFor(file).results);
+    const state = this.stateFor(file);
+    edit(problem.tests, state.results, state.explanations);
     this.problem = problem;
     await saveProblem(file, problem);
     this.postState();
@@ -419,7 +474,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   private stateFor(file: string): FileState {
     let state = this.fileStates.get(file);
     if (!state) {
-      state = { results: [], compile: { status: 'idle' } };
+      state = { results: [], compile: { status: 'idle' }, explanations: [] };
       this.fileStates.set(file, state);
     }
     return state;
@@ -451,6 +506,11 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         compile: state?.compile ?? { status: 'idle' },
         running: file !== undefined && this.runningFile === file,
         browserSubmit: (!this.csesTask() && problem && browserSubmitTarget(problem.url)?.judge) || null,
+        ai: this.assistant.enabled && {
+          explanations: problem?.tests.map((_, i) => state?.explanations[i] ?? null) ?? [],
+          stress: state?.stress ?? null,
+          canStress: Boolean(problem && !problem.interactive && !problem.io && problem.tests.length > 0),
+        },
         cses: this.csesTask() && {
           user: this.csesUser ? (this.csesUser.displayname ?? this.csesUser.username) : null,
           submitting: file !== undefined && this.submitting.has(file),

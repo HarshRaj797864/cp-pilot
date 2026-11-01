@@ -32,6 +32,14 @@ Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>R</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>
 
 CP Pilot warns you before submitting if local tests failed on the last run.
 
+### ✨ AI practice help (optional)
+For practice and upsolving, not live contests:
+
+- **✨ Why?** on a failing test: the AI points at the likely bug and the lines involved, and gives a hint (not a rewritten solution).
+- **🔍 Stress test**: the AI writes a random test generator and a slow brute force, CP Pilot runs hundreds of small tests through the local judge and shows the first input where your answer differs, which you can add as a test in one click. For CSES the statement is fetched automatically; elsewhere paste it, or bring your own brute force.
+- **Contest guard**: AI features turn off for Codeforces and AtCoder contests that are running right now. For other judges CP Pilot asks you to confirm it's practice.
+- Uses **GitHub Copilot's models** if you have Copilot (free for students), otherwise **your own Claude API key** (`CP Pilot: AI: Set Claude API Key`, stored in VS Code's secret storage; Claude Sonnet 5.5 by default). Turn it all off with `cpPilot.ai.enabled`.
+
 ### 📊 CSES problem browser
 All 400 CSES problems in the sidebar by category, with ✅ solved / ❌ attempted status, progress like `Dynamic Programming 14/19`, search, and a hide-solved toggle. It updates as soon as a submission is accepted. Click a problem to open it on cses.fi.
 
@@ -63,6 +71,11 @@ Competitive Companion sends problems to port `27121` by default, which CPH also 
 | `cpPilot.languageCommands` | `{}` | Override compile/run commands, e.g. `{ "cpp": { "compile": "g++ -std=c++20 -O2 -DLOCAL -o ${exe} ${file}" } }` |
 | `cpPilot.codeforces.languageIds` | CPH's defaults | Codeforces compiler per language for one-click submit, e.g. `{ "cpp": 89 }` for G++20 |
 | `cpPilot.cses.languages` | | CSES language/version per file type, e.g. `{ "python": { "option": "CPython3" } }` |
+| `cpPilot.ai.enabled` | `true` | Show the AI features |
+| `cpPilot.ai.provider` | `auto` | `auto` (Copilot, else Claude key), `copilot` or `claude` |
+| `cpPilot.ai.claudeModel` | `claude-sonnet-5-5` | Claude model used with your API key |
+| `cpPilot.ai.copilotModelFamily` | | Preferred Copilot model family, e.g. `claude-sonnet` |
+| `cpPilot.ai.stressIterations` | `300` | Random tests per stress test (also capped at one minute) |
 
 Default commands: `g++ -std=gnu++17 -O2`, `gcc -std=gnu11 -O2`, `python3` (`python` on Windows), `java File.java` (Java 11+), `rustc -O`, `go build`, `node`. Tests and binaries live in a `.cp-pilot/` folder next to your solutions; add it to `.gitignore` if you keep solutions in git.
 
@@ -76,6 +89,8 @@ Default commands: `g++ -std=gnu++17 -O2`, `gcc -std=gnu11 -O2`, `python3` (`pyth
 | CP Pilot: Log In to CSES / Log Out of CSES | |
 | CP Pilot: Search / Refresh CSES Problems | |
 | CP Pilot: Restart Competitive Companion Listener | click the status bar item |
+| CP Pilot: AI: Why Did This Test Fail? / Stress Test Against a Brute Force | |
+| CP Pilot: AI: Set / Remove Claude API Key | |
 
 ## CSES language notes
 
@@ -89,7 +104,7 @@ CSES picks the language from the file extension ([versions](https://cses.fi/howt
 
 ## Privacy
 
-CP Pilot has no telemetry. It listens on `127.0.0.1` only (for Competitive Companion and cph-submit) and talks to `cses.fi` for CSES features. Your CSES login token is kept in VS Code's secret storage. Running tests executes your code, so it's disabled in [untrusted workspaces](https://code.visualstudio.com/docs/editor/workspace-trust).
+CP Pilot has no telemetry. It listens on `127.0.0.1` only (for Competitive Companion and cph-submit) and talks to `cses.fi` for CSES features. AI features send your code, the failing test and (if available) the statement to the provider you use (GitHub Copilot or Anthropic), and check `codeforces.com` / `atcoder.jp` for live contests; nothing is sent unless you click an AI button. Your CSES login token is kept in VS Code's secret storage. Running tests executes your code, so it's disabled in [untrusted workspaces](https://code.visualstudio.com/docs/editor/workspace-trust).
 
 ## Feedback
 

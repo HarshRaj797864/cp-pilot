@@ -283,3 +283,85 @@ pre.stderr {
 .chip.v-TLE {
   background: var(--vscode-editorWarning-foreground);
 }
+
+/* AI features */
+
+button.why {
+  padding: 2px 8px;
+  font-size: 0.9em;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.ai-box {
+  margin: 8px 0;
+  padding: 6px 8px;
+  border-radius: 2px;
+  border-left: 3px solid var(--vscode-charts-purple, var(--vscode-focusBorder));
+  background: var(--vscode-textBlockQuote-background);
+}
+
+.ai-box.loading {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.ai-box.error,
+.ai-box.stress-error {
+  border-left-color: var(--vscode-testing-iconFailed);
+}
+
+.ai-box.stress-found {
+  border-left-color: var(--vscode-testing-iconFailed);
+}
+
+.ai-box.stress-passed {
+  border-left-color: var(--vscode-testing-iconPassed);
+}
+
+.ai-box p {
+  margin: 6px 0;
+}
+
+.ai-box a {
+  color: var(--vscode-textLink-foreground);
+}
+
+.ai-box progress {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.ai-box button {
+  margin-top: 6px;
+}
+
+.ai-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ai-lines {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.ai-hint {
+  margin-top: 6px;
+}
+
+.ai-by {
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.confidence {
+  font-size: 0.8em;
+  padding: 0 4px;
+  border-radius: 2px;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+}

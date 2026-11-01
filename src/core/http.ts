@@ -15,6 +15,8 @@ export interface HttpRequest {
 export interface HttpResponse {
   status: number;
   text: string;
+  /** Lower-cased header names; repeated headers are joined with ", ". */
+  headers?: Record<string, string>;
 }
 
 export type HttpTransport = (req: HttpRequest) => Promise<HttpResponse>;
@@ -39,7 +41,7 @@ export const nodeTransport: HttpTransport = async (req) => {
   let current = req;
   for (let redirects = 0; ; redirects++) {
     const res = await send(current);
-    if (!res.location || redirects >= MAX_REDIRECTS) return { status: res.status, text: res.text };
+    if (!res.location || redirects >= MAX_REDIRECTS) return { status: res.status, text: res.text, headers: res.headers };
 
     const from = new URL(current.url);
     const to = new URL(res.location, from);
@@ -85,9 +87,14 @@ function send(req: HttpRequest): Promise<HttpResponse & { location?: string }> {
         res.on('data', (c: Buffer) => chunks.push(c));
         res.on('end', () => {
           const status = res.statusCode ?? 0;
+          const headers: Record<string, string> = {};
+          for (const [name, value] of Object.entries(res.headers)) {
+            if (value !== undefined) headers[name] = Array.isArray(value) ? value.join(', ') : value;
+          }
           resolve({
             status,
             text: Buffer.concat(chunks).toString('utf8'),
+            headers,
             location: REDIRECT_STATUSES.has(status) ? res.headers.location : undefined,
           });
         });
@@ -100,4 +107,33 @@ function send(req: HttpRequest): Promise<HttpResponse & { location?: string }> {
     request.on('error', reject);
     request.end(req.body);
   });
+}
+
+/**
+ * A `fetch` for libraries that take one (e.g. the Anthropic SDK), backed by nodeTransport so it gets
+ * the same IPv4-first resolution. Buffers the response, so it's for request/response calls, not streams.
+ */
+export function transportFetch(transport: HttpTransport = nodeTransport, timeoutMs = 10 * 60_000): typeof fetch {
+  return (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    if (method !== 'GET' && method !== 'POST') throw new Error(`transportFetch: unsupported method ${method}`);
+    if (init?.body !== undefined && init.body !== null && typeof init.body !== 'string') {
+      throw new Error('transportFetch: only string bodies are supported');
+    }
+    const headers: Record<string, string> = {};
+    new Headers(init?.headers).forEach((value, name) => (headers[name] = value));
+
+    const res = await transport({
+      method,
+      url,
+      headers,
+      body: init?.body ?? undefined,
+      timeoutMs,
+      signal: init?.signal ?? undefined,
+    });
+    // Status codes without a body (e.g. 204) can't be given one in the Response constructor.
+    const body = res.status === 204 || res.status === 304 ? null : res.text;
+    return new Response(body, { status: res.status, headers: res.headers });
+  }) as typeof fetch;
 }

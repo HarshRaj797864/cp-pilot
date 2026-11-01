@@ -32,7 +32,7 @@ describe('nodeTransport', () => {
       body: 'héllo',
       timeoutMs: 5000,
     });
-    expect(res).toEqual({ status: 201, text: 'POST yes héllo' });
+    expect(res).toMatchObject({ status: 201, text: 'POST yes héllo' });
   });
 
   it('follows a POST redirect as a GET, keeping same-origin headers', async () => {
@@ -47,7 +47,7 @@ describe('nodeTransport', () => {
       body: '{}',
       timeoutMs: 5000,
     });
-    expect(res).toEqual({ status: 200, text: 'GET /result/42 token=t' });
+    expect(res).toMatchObject({ status: 200, text: 'GET /result/42 token=t' });
   });
 
   it('repeats the method and body on 307', async () => {
