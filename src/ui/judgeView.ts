@@ -126,8 +126,9 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
     const media = vscode.Uri.joinPath(this.extensionUri, 'media');
-    view.webview.options = { enableScripts: true, localResourceRoots: [media] };
-    view.webview.html = this.html(view.webview, media);
+    const codicons = vscode.Uri.joinPath(this.extensionUri, 'dist', 'codicons');
+    view.webview.options = { enableScripts: true, localResourceRoots: [media, codicons] };
+    view.webview.html = this.html(view.webview, media, codicons);
     view.webview.onDidReceiveMessage(
       (m: Message) =>
         this.onMessage(m).catch((err) =>
@@ -520,16 +521,18 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     });
   }
 
-  private html(webview: vscode.Webview, media: vscode.Uri): string {
+  private html(webview: vscode.Webview, media: vscode.Uri, codicons: vscode.Uri): string {
     const nonce = crypto.randomBytes(16).toString('base64');
     const css = webview.asWebviewUri(vscode.Uri.joinPath(media, 'judge.css'));
+    const icons = webview.asWebviewUri(vscode.Uri.joinPath(codicons, 'codicon.css'));
     const js = webview.asWebviewUri(vscode.Uri.joinPath(media, 'judge.js'));
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="${icons}" rel="stylesheet">
   <link href="${css}" rel="stylesheet">
 </head>
 <body>

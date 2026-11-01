@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ClaudeProvider } from '../src/ai/claude';
 import { orderModels } from '../src/ai/modelOrder';
+import { plainMath } from '../src/ai/plainText';
 import { DIAGNOSE_SYSTEM, clip, diagnosePrompt, numberLines, stressPrompt } from '../src/ai/prompts';
 import { AiError, extractJson, parseStructured } from '../src/ai/provider';
 import { Diagnosis, StressPrograms } from '../src/ai/schemas';
@@ -145,5 +146,18 @@ describe('orderModels (Copilot fallback order)', () => {
     expect(orderModels(models, '').map((m) => m.id)).toEqual(['c', 'a', 'd', 'b']);
     expect(orderModels(models, 'gpt-4.1').map((m) => m.id)).toEqual(['d', 'c', 'a', 'b']);
     expect(orderModels(models, '', 'b').map((m) => m.id)).toEqual(['b', 'c', 'a', 'd']);
+  });
+});
+
+describe('plainMath', () => {
+  it.each([
+    // From a real answer that rendered raw in the panel.
+    ['For $n=5$, line 7 uses $n(n-1)/2=10$ instead of $n(n+1)/2=15$.', 'For n=5, line 7 uses n(n-1)/2=10 instead of n(n+1)/2=15.'],
+    ['the sum $1+\\dots+n$', 'the sum 1+…+n'],
+    ['$2 \\le n \\le 2 \\cdot 10^5$', '2 ≤ n ≤ 2 · 10^5'],
+    ['$\\frac{n}{2}$ and $\\text{ans}$', '(n)/(2) and ans'],
+    ['plain text stays', 'plain text stays'],
+  ])('%j', (input, output) => {
+    expect(plainMath(input)).toBe(output);
   });
 });

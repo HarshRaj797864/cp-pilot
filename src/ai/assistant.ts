@@ -5,6 +5,7 @@ import { csesTaskId } from '../cses/api';
 import { fetchCsesStatement } from '../cses/statement';
 import { ClaudeProvider, DEFAULT_CLAUDE_MODEL } from './claude';
 import { CopilotProvider } from './copilot';
+import { plainDiagnosis } from './plainText';
 import { DIAGNOSE_SYSTEM, DiagnoseInput, STRESS_SYSTEM, StressInput, diagnosePrompt, stressPrompt } from './prompts';
 import { AiError, AiProvider } from './provider';
 import { Diagnosis, StressPrograms } from './schemas';
@@ -34,7 +35,7 @@ export class AiAssistant {
       schema: Diagnosis,
       signal,
     });
-    return { diagnosis, by: provider.label };
+    return { diagnosis: plainDiagnosis(diagnosis), by: provider.label };
   }
 
   async stressPrograms(problem: Problem, input: StressInput, signal?: AbortSignal): Promise<{ programs: StressPrograms; by: string }> {

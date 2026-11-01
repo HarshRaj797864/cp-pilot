@@ -120,4 +120,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for building and running from source.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The Judge panel's icons are [Codicons](https://github.com/microsoft/vscode-codicons) by Microsoft, licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

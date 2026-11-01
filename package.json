@@ -279,7 +279,11 @@
         "cpPilot.ai.provider": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "copilot", "claude"],
+          "enum": [
+            "auto",
+            "copilot",
+            "claude"
+          ],
           "enumDescriptions": [
             "GitHub Copilot's models if available (no key needed), otherwise your Claude API key.",
             "Only GitHub Copilot's models.",
@@ -417,6 +421,7 @@
   "devDependencies": {
     "@types/node": "^20.14.0",
     "@types/vscode": "~1.90.0",
+    "@vscode/codicons": "^0.0.46-24",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.6.0",

@@ -18,7 +18,18 @@ const problemMatcherPlugin = {
   },
 };
 
+/** The Judge webview uses VS Code's codicon icon font; ship its CSS and font next to the bundle. */
+function copyCodicons() {
+  const fs = require('fs');
+  const path = require('path');
+  const from = path.join(__dirname, 'node_modules', '@vscode', 'codicons', 'dist');
+  const to = path.join(__dirname, 'dist', 'codicons');
+  fs.mkdirSync(to, { recursive: true });
+  for (const file of ['codicon.css', 'codicon.ttf']) fs.copyFileSync(path.join(from, file), path.join(to, file));
+}
+
 async function main() {
+  copyCodicons();
   const ctx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,

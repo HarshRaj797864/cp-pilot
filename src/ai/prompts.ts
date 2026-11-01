@@ -37,7 +37,8 @@ Find the most likely reason it fails this test: wrong algorithm, overflow, off-b
 Point at the specific lines involved, using the line numbers shown in the code.
 Give a hint that leads the student to the fix, but do not write a corrected solution or replacement code: the student learns more by fixing it.
 If the expected output is ambiguous (several answers may be accepted), say so instead of calling a valid answer wrong.
-Be concise and concrete.`;
+Be concise and concrete.
+Your text is shown as plain text in a narrow panel: write math the way code does (n*(n+1)/2, a[i] <= x), never LaTeX ($...$, \\le) or Markdown.`;
 
 export interface DiagnoseInput {
   language: Language;
