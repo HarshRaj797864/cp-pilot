@@ -334,18 +334,52 @@
     );
   }
 
+  /** Compile-error box parts, rebuilt only when the compiler output changes. */
+  let compileWhy = /** @type {HTMLButtonElement | null} */ (null);
+  let compileExplain = /** @type {HTMLElement | null} */ (null);
+
   function updateCompile() {
     const c = state.compile;
     header.compile.hidden = c.status !== 'compiling' && c.status !== 'error';
     if (c.status === 'compiling') {
+      if (unchanged(header.compile, 'compiling')) return;
       header.compile.className = 'notice';
       header.compile.replaceChildren(icon('loading codicon-modifier-spin'), h('span', {}, ['Compiling…']));
-    } else if (c.status === 'error') {
+      return;
+    }
+    if (c.status !== 'error') return;
+
+    if (!unchanged(header.compile, c.output)) {
       header.compile.className = 'notice error';
+      compileWhy = /** @type {HTMLButtonElement} */ (
+        h(
+          'button',
+          {
+            class: 'why',
+            title: 'Ask AI what this compiler error means (practice only)',
+            onclick: (/** @type {Event} */ e) => {
+              // The button sits in the <summary>; don't fold the box.
+              e.preventDefault();
+              e.stopPropagation();
+              post('explainCompile');
+            },
+          },
+          [icon('sparkle'), h('span', {}, ['Why?'])],
+        )
+      );
+      compileExplain = h('div', { class: 'ai-card' });
       header.compile.replaceChildren(
-        h('details', { open: '' }, [h('summary', {}, [icon('error'), h('span', {}, ['Compilation error'])]), h('pre', { class: 'io' }, [c.output])]),
+        h('details', { open: '' }, [
+          h('summary', {}, [icon('error'), h('span', {}, ['Compilation error']), h('span', { class: 'spacer' }), compileWhy]),
+          h('pre', { class: 'io' }, [c.output]),
+        ]),
+        compileExplain,
       );
     }
+    const explanation = state.ai ? state.ai.compileExplanation : null;
+    /** @type {HTMLButtonElement} */ (compileWhy).hidden = !state.ai;
+    /** @type {HTMLButtonElement} */ (compileWhy).disabled = Boolean(explanation && explanation.status === 'loading');
+    renderExplanation(/** @type {HTMLElement} */ (compileExplain), explanation);
   }
 
   function updateCses() {
@@ -404,11 +438,11 @@
     const head = (/** @type {(Node|string)[]} */ ...rest) => h('div', { class: 'card-head' }, [icon('sparkle'), h('span', { class: 'ai-label' }, ['AI']), ...rest]);
     if (x.status === 'loading') {
       box.className = 'ai-card loading';
-      return box.replaceChildren(head(h('span', { class: 'muted' }, ['Looking at this test…']), h('span', { class: 'spacer' }), icon('loading codicon-modifier-spin')));
+      return box.replaceChildren(head(h('span', { class: 'muted' }, ['Thinking…']), h('span', { class: 'spacer' }), icon('loading codicon-modifier-spin')));
     }
     if (x.status === 'error') {
       box.className = 'ai-card error';
-      return box.replaceChildren(head(h('span', { class: 'muted' }, ["Couldn't explain this test"])), h('p', {}, [x.message]));
+      return box.replaceChildren(head(h('span', { class: 'muted' }, ["Couldn't explain this"])), h('p', {}, [x.message]));
     }
     const d = x.diagnosis;
     const hint = h('p', { class: 'hint', hidden: '' }, [d.hint]);

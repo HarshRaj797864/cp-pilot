@@ -94,3 +94,23 @@ export function stressPrompt(s: StressInput): string {
     block('student_code', clip(s.code, 8000)),
   ].join('\n\n');
 }
+
+export const COMPILE_SYSTEM = `You explain compiler errors to a competitive programmer, in plain words.
+You are given their code with line numbers and the compiler's output. Compiler messages are often long and cryptic (template errors, cascades of follow-on errors); find the first real cause.
+Say what the error means, point at the line(s) that cause it using the line numbers shown, and give the concrete fix (for example "add a semicolon at the end of line 7" or "declare x before line 12"). Fixing a compile error is fine to spell out; don't rewrite the algorithm or comment on whether the solution is correct.
+If one mistake causes several errors, say so and focus on that mistake.
+Your text is shown as plain text in a narrow panel: write code the way it appears in the file, never LaTeX or Markdown.`;
+
+export interface CompileErrorInput {
+  language: Language;
+  code: string;
+  compilerOutput: string;
+}
+
+export function compileErrorPrompt(c: CompileErrorInput): string {
+  return [
+    `Language: ${LANGUAGE_NAMES[c.language]}`,
+    block('code', numberLines(c.code)),
+    block('compiler_output', clip(c.compilerOutput, 6000)),
+  ].join('\n\n');
+}

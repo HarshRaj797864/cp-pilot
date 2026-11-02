@@ -41,6 +41,8 @@ interface FileState {
   submission?: SubmissionState;
   /** AI "Why?" answers, by test index; cleared when that test is re-run or edited. */
   explanations: (ExplainState | undefined)[];
+  /** AI explanation of the current compile error; cleared on the next compile. */
+  compileExplanation?: ExplainState;
   stress?: StressState;
 }
 
@@ -58,6 +60,7 @@ type Message =
   | { type: 'csesLogout' }
   | { type: 'openSubmission'; id: number }
   | { type: 'explain'; index: number }
+  | { type: 'explainCompile' }
   | { type: 'revealLine'; line: number }
   | { type: 'stress' }
   | { type: 'stopStress' }
@@ -96,6 +99,14 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         return this.file && this.problem && language ? { file: this.file, problem: this.problem, language } : undefined;
       },
       results: (file) => this.stateFor(file).results,
+      compileError: (file) => {
+        const compile = this.stateFor(file).compile;
+        return compile.status === 'error' ? compile.output : undefined;
+      },
+      setCompileExplanation: (file, s) => {
+        const state = this.stateFor(file);
+        this.update(file, () => (state.compileExplanation = s));
+      },
       setExplanation: (file, index, s) => {
         const state = this.stateFor(file);
         this.update(file, () => (state.explanations[index] = s));
@@ -356,7 +367,11 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         timeLimitMs: problem.timeLimit,
         io: problem.io,
         commands: getLanguageCommands(language),
-        onCompileStart: () => this.update(file, () => (state.compile = { status: 'compiling' })),
+        onCompileStart: () =>
+          this.update(file, () => {
+            state.compile = { status: 'compiling' };
+            state.compileExplanation = undefined;
+          }),
         onCompileEnd: (r: CompileResult) =>
           this.update(file, () => (state.compile = r.ok ? { status: 'ok' } : { status: 'error', output: r.output })),
         onTestStart: (i) => this.update(file, () => (state.results[i] = 'running')),
@@ -422,6 +437,8 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
           results[m.index] = null;
           explanations[m.index] = undefined;
         });
+      case 'explainCompile':
+        return this.ai.explainCompile();
       case 'explain':
         return this.ai.explain(m.index);
       case 'revealLine':
@@ -509,6 +526,7 @@ export class JudgeViewProvider implements vscode.WebviewViewProvider, vscode.Dis
         browserSubmit: (!this.csesTask() && problem && browserSubmitTarget(problem.url)?.judge) || null,
         ai: this.assistant.enabled && {
           explanations: problem?.tests.map((_, i) => state?.explanations[i] ?? null) ?? [],
+          compileExplanation: state?.compileExplanation ?? null,
           stress: state?.stress ?? null,
           canStress: Boolean(problem && !problem.interactive && !problem.io && problem.tests.length > 0),
         },

@@ -29,7 +29,10 @@ export type StressState =
 export interface AiHost {
   current(): { file: string; problem: Problem; language: Language } | undefined;
   results(file: string): (TestResult | 'running' | null)[];
+  /** The compiler output when the last compile failed. */
+  compileError(file: string): string | undefined;
   setExplanation(file: string, index: number, state: ExplainState | undefined): void;
+  setCompileExplanation(file: string, state: ExplainState | undefined): void;
   setStress(file: string, state: StressState | undefined): void;
   stressState(file: string): StressState | undefined;
   addTest(file: string, test: TestCase): Promise<void>;
@@ -46,13 +49,14 @@ export class AiFeatures {
     private readonly host: AiHost,
   ) {}
 
-  /** "Why did this fail?" for test `index`, or the first failing test. */
+  /** "Why did this fail?" for test `index`, or the compile error, or the first failing test. */
   async explain(index?: number): Promise<void> {
     const cur = this.host.current();
     if (!cur) {
       vscode.window.showInformationMessage('CP Pilot: open a solution file with tests first.');
       return;
     }
+    if (index === undefined && this.host.compileError(cur.file) !== undefined) return this.explainCompile();
     const results = this.host.results(cur.file);
     const i = index ?? results.findIndex((r) => r && r !== 'running' && r.verdict !== 'AC');
     const result = results[i];
@@ -78,6 +82,28 @@ export class AiFeatures {
       this.host.setExplanation(cur.file, i, { status: 'done', diagnosis, by });
     } catch (err) {
       this.host.setExplanation(cur.file, i, { status: 'error', message: errorMessage(err) });
+    }
+  }
+
+  /** Explains the last compile error in plain words. */
+  async explainCompile(): Promise<void> {
+    const cur = this.host.current();
+    const output = cur && this.host.compileError(cur.file);
+    if (!cur || output === undefined) {
+      vscode.window.showInformationMessage('CP Pilot: there is no compile error to explain.');
+      return;
+    }
+    await this.host.reveal();
+    this.host.setCompileExplanation(cur.file, { status: 'loading' });
+    try {
+      const { diagnosis, by } = await this.assistant.explainCompileError(cur.problem, {
+        language: cur.language,
+        code: await readCode(cur.file),
+        compilerOutput: output,
+      });
+      this.host.setCompileExplanation(cur.file, { status: 'done', diagnosis, by });
+    } catch (err) {
+      this.host.setCompileExplanation(cur.file, { status: 'error', message: errorMessage(err) });
     }
   }
 

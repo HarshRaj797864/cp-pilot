@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ClaudeProvider } from '../src/ai/claude';
 import { orderModels } from '../src/ai/modelOrder';
 import { plainMath } from '../src/ai/plainText';
-import { DIAGNOSE_SYSTEM, clip, diagnosePrompt, numberLines, stressPrompt } from '../src/ai/prompts';
+import { COMPILE_SYSTEM, DIAGNOSE_SYSTEM, clip, compileErrorPrompt, diagnosePrompt, numberLines, stressPrompt } from '../src/ai/prompts';
 import { AiError, extractJson, parseStructured } from '../src/ai/provider';
 import { Diagnosis, StressPrograms } from '../src/ai/schemas';
 
@@ -159,5 +159,20 @@ describe('plainMath', () => {
     ['plain text stays', 'plain text stays'],
   ])('%j', (input, output) => {
     expect(plainMath(input)).toBe(output);
+  });
+});
+
+describe('compile error prompt', () => {
+  it('sends numbered code and the compiler output, and asks for the concrete fix', () => {
+    const p = compileErrorPrompt({
+      language: 'cpp',
+      code: 'int main() {\n  int x = 1\n}',
+      compilerOutput: "a.cpp:2:12: error: expected ';' before '}' token",
+    });
+    expect(p).toContain('Language: C++17');
+    expect(p).toContain('2 |   int x = 1');
+    expect(p).toContain("<compiler_output>\na.cpp:2:12: error: expected ';' before '}' token\n</compiler_output>");
+    expect(COMPILE_SYSTEM).toMatch(/concrete fix/);
+    expect(COMPILE_SYSTEM).toMatch(/first real cause/);
   });
 });
