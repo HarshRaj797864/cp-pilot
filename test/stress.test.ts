@@ -38,7 +38,8 @@ async function program(name: string, code: string) {
   return { file, commands: run };
 }
 
-describe('stressTest', () => {
+// Each case starts dozens of processes; slow or busy machines (and CI) need more than vitest's 5 s default.
+describe('stressTest', { timeout: 30_000 }, () => {
   it('passes a correct solution', async () => {
     const result = await stressTest({
       solution: await program('sol.js', CORRECT),

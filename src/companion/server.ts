@@ -5,7 +5,24 @@ import { CphSubmitQueue } from './cphSubmit';
 
 const MAX_BODY_BYTES = 10 * 1024 * 1024;
 
+/** Paths other CP Pilot windows use to find each other on the shared port. */
+export const IDENTITY_PATH = '/cp-pilot';
+export const HANDOFF_PATH = '/cp-pilot/handoff';
+/**
+ * Required on handoff requests. A web page can't send a custom header to localhost without a CORS
+ * preflight, which this server never approves, so only another CP Pilot window can trigger a handoff.
+ */
+export const HANDOFF_HEADER = 'x-cp-pilot-handoff';
+
 export type ProblemHandler = (problem: Problem, batch: Batch | undefined) => void | Promise<void>;
+
+/** Lets CP Pilot windows coordinate: who is listening, and asking it to step aside. */
+export interface WindowControl {
+  /** Shown to other windows, e.g. the open folder's name. */
+  identity(): { folder: string };
+  /** Another window asked for the port; the server has already stopped. */
+  onHandoff(): void;
+}
 
 /**
  * Receives problems from the Competitive Companion browser extension, which POSTs
@@ -19,6 +36,7 @@ export class CompanionServer {
     private readonly onError: (err: unknown) => void = () => {},
     /** Serves GET /getSubmit for the cph-submit add-on when given. */
     private readonly submitQueue?: CphSubmitQueue,
+    private readonly control?: WindowControl,
   ) {}
 
   get port(): number | undefined {
@@ -45,13 +63,31 @@ export class CompanionServer {
     const server = this.server;
     this.server = undefined;
     if (!server) return Promise.resolve();
-    return new Promise((resolve) => server.close(() => resolve()));
+    return new Promise((resolve) => {
+      server.close(() => resolve());
+      // Don't let an idle keep-alive connection hold the port after a handoff.
+      server.closeIdleConnections();
+    });
   }
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
-    if (req.method === 'GET' && req.url?.split('?')[0] === '/getSubmit' && this.submitQueue) {
+    const path = req.url?.split('?')[0];
+    if (req.method === 'GET' && path === '/getSubmit' && this.submitQueue) {
       const payload = this.submitQueue.take(req.headers['cph-submit'] === 'true');
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(payload ?? { empty: true }));
+      return;
+    }
+    if (this.control && req.method === 'GET' && path === IDENTITY_PATH) {
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ app: 'cp-pilot', ...this.control.identity() }));
+      return;
+    }
+    if (this.control && path === HANDOFF_PATH) {
+      if (req.method !== 'POST' || req.headers[HANDOFF_HEADER] !== '1') {
+        res.writeHead(403).end();
+        return;
+      }
+      const control = this.control;
+      res.writeHead(200).end(() => void this.stop().then(() => control.onHandoff()));
       return;
     }
     if (req.method !== 'POST') {

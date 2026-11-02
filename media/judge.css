@@ -605,3 +605,84 @@ textarea:focus {
 .empty p {
   margin: 8px 0 0;
 }
+
+/* Folded rows show the start of the input so tests can be told apart. */
+.peek {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.85em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.test:not(.folded) .peek {
+  visibility: hidden;
+}
+
+.test-row .peek + .spacer {
+  display: none;
+}
+
+/* Summary: one numbered box per test; click to jump to it. */
+.boxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.box {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--muted);
+  background: var(--surface-strong);
+}
+
+.box:hover {
+  border-color: var(--vscode-focusBorder);
+}
+
+.box[data-verdict='AC'] {
+  color: var(--pass);
+  background: color-mix(in srgb, var(--pass) 18%, transparent);
+}
+
+.box[data-verdict='WA'],
+.box[data-verdict='RE'],
+.box[data-verdict='MLE'],
+.box[data-verdict='OLE'] {
+  color: var(--fail);
+  background: color-mix(in srgb, var(--fail) 18%, transparent);
+}
+
+.box[data-verdict='TLE'] {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+}
+
+.box[data-verdict='running'] {
+  color: var(--vscode-progressBar-background);
+}
+
+/* Brief highlight on the test a box jumped to. */
+.test.flash {
+  animation: flash 1.2s ease-out;
+}
+
+@keyframes flash {
+  0%,
+  30% {
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+  }
+  100% {
+    box-shadow: 0 0 0 1px transparent;
+  }
+}

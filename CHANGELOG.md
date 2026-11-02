@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1 (preview)
+
+- **✨ Why? on compile errors**: the AI explains a confusing compiler message in plain words, points at the line and gives the fix.
+- **Jump to a test**: after a run, the summary shows one numbered box per test; click one to open that test and scroll to it. Folded tests show the start of their input.
+- **Calmer port handling**: another VS Code window running CP Pilot no longer triggers a warning; problems from Competitive Companion go to the window you switch to. If CPH or another program holds the port, one clear message names it and offers to move CP Pilot to a free port.
+
 ## 0.2.0 (preview)
 
 ### AI practice help

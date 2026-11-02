@@ -7,15 +7,14 @@ import { CsesAuth } from './cses/auth';
 import { CsesProblemsProvider } from './ui/csesTree';
 import { JudgeViewProvider } from './ui/judgeView';
 import { ProblemImporter } from './workspace/importer';
-import { SECTION, getSettings } from './workspace/settings';
+import { CompanionListener } from './workspace/listener';
+import { SECTION } from './workspace/settings';
 
 let server: CompanionServer | undefined;
-let statusItem: vscode.StatusBarItem;
-let log: vscode.LogOutputChannel;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  log = vscode.window.createOutputChannel('CP Pilot', { log: true });
-  statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
+  const log = vscode.window.createOutputChannel('CP Pilot', { log: true });
+  const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   statusItem.command = 'cpPilot.restartListener';
   context.subscriptions.push(log, statusItem);
 
@@ -39,6 +38,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   problems.attach(problemsView);
 
   const importer = new ProblemImporter(() => judge.refresh());
+  // Created right after the server; the server only calls back into it once it's listening.
+  let listener: CompanionListener | undefined;
   server = new CompanionServer(
     async (problem, batch) => {
       const io = problem.io ? ` (file I/O: ${problem.io.inputFile ?? 'stdin'} -> ${problem.io.outputFile ?? 'stdout'})` : '';
@@ -48,7 +49,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     },
     (err) => log.error('Failed to handle problem', err),
     cphSubmitQueue,
+    {
+      identity: () => ({ folder: vscode.workspace.name ?? 'a window without a folder' }),
+      onHandoff: () => listener?.onHandoff(),
+    },
   );
+  listener = new CompanionListener(server, statusItem, log, context.globalState);
+
+  const PORT_CHANGE_DEBOUNCE_MS = 800;
+  let portChangeTimer: NodeJS.Timeout | undefined;
 
   context.subscriptions.push(
     importer,
@@ -80,64 +89,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
     vscode.commands.registerCommand('cpPilot.runTests', () => judge.runTests()),
     vscode.commands.registerCommand('cpPilot.stopTests', () => judge.stop()),
-    vscode.commands.registerCommand('cpPilot.restartListener', () => startListener()),
+    // Clicking the status bar item retries, taking the port from another CP Pilot window if needed.
+    vscode.commands.registerCommand('cpPilot.restartListener', () => listener!.restart({ takeOver: true })),
+    vscode.window.onDidChangeWindowState((s) => {
+      if (s.focused) listener!.onWindowFocused();
+    }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration(`${SECTION}.companionPort`)) return;
       // The settings UI saves on every keystroke (2, 27, 271, ...); only act once typing settles.
       clearTimeout(portChangeTimer);
-      portChangeTimer = setTimeout(() => void startListener(), PORT_CHANGE_DEBOUNCE_MS);
+      portChangeTimer = setTimeout(() => void listener!.restart(), PORT_CHANGE_DEBOUNCE_MS);
     }),
     { dispose: () => clearTimeout(portChangeTimer) },
     { dispose: () => void server?.stop() },
   );
 
-  // Not awaited: a port warning waiting for the user must not hold up activation.
-  void startListener();
+  // Not awaited: a port message waiting for the user must not hold up activation.
+  // A window opened (and focused) now is where the user works, so it may take the port.
+  void listener.restart({ takeOver: vscode.window.state.focused });
 }
 
 export async function deactivate(): Promise<void> {
   await server?.stop();
-}
-
-const PORT_CHANGE_DEBOUNCE_MS = 800;
-let portChangeTimer: NodeJS.Timeout | undefined;
-let listenerQueue: Promise<void> = Promise.resolve();
-
-/** Restarts are queued so two can never interleave and leave a stale status or a leaked socket. */
-function startListener(): Promise<void> {
-  listenerQueue = listenerQueue.then(restartListener);
-  return listenerQueue;
-}
-
-async function restartListener(): Promise<void> {
-  if (!server) return;
-  await server.stop();
-  const { companionPort } = getSettings();
-  try {
-    const port = await server.start(companionPort);
-    log.info(`Listening for Competitive Companion on port ${port}`);
-    showStatus(`$(radio-tower) CP Pilot :${port}`, `Listening for Competitive Companion on port ${port}`);
-  } catch (err) {
-    const code = (err as NodeJS.ErrnoException).code;
-    log.error(`Could not listen on port ${companionPort}`, err);
-    showStatus(`$(warning) CP Pilot`, `Not listening (port ${companionPort} unavailable). Click to retry.`);
-    const reason =
-      code === 'EADDRINUSE'
-        ? `port ${companionPort} is already in use by another app (CPH uses 27121, CPOS 27122). Pick a free one such as 27150 and add it under "Custom ports" in Competitive Companion's settings.`
-        : code === 'EACCES'
-          ? `port ${companionPort} needs admin rights. Pick a port above 1024.`
-          : `couldn't listen on port ${companionPort} (${code ?? String(err)}).`;
-    // Shown without awaiting so the restart queue isn't blocked on the user.
-    void vscode.window.showWarningMessage(`CP Pilot: ${reason}`, 'Change Port').then((choice) => {
-      if (choice === 'Change Port') {
-        void vscode.commands.executeCommand('workbench.action.openSettings', `${SECTION}.companionPort`);
-      }
-    });
-  }
-}
-
-function showStatus(text: string, tooltip: string): void {
-  statusItem.text = text;
-  statusItem.tooltip = tooltip;
-  statusItem.show();
 }

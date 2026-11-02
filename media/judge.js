@@ -10,14 +10,18 @@
   let layoutKey = '';
   /** @type {Card[]} */
   let cards = [];
-  /** Tests the user opened or closed by hand; otherwise passing tests fold and the rest stay open. */
+  /** Tests the user opened or closed by hand; otherwise tests are folded rows and only failures open. */
   const folded = new Map();
   let wasRunning = false;
+  /** @type {string | null} */
+  let lastFile = null;
+  let lastCount = 0;
 
   /**
    * @typedef {{ root: HTMLElement, chevron: HTMLElement, pill: HTMLElement, time: HTMLElement,
    *   input: HTMLTextAreaElement, expected: HTMLTextAreaElement, received: HTMLElement, receivedOut: HTMLElement,
-   *   stderr: HTMLElement, message: HTMLElement, runBtn: HTMLButtonElement, whyBtn: HTMLButtonElement, explain: HTMLElement }} Card
+   *   stderr: HTMLElement, message: HTMLElement, runBtn: HTMLButtonElement, whyBtn: HTMLButtonElement, explain: HTMLElement,
+   *   peek: HTMLElement }} Card
    */
 
   /**
@@ -88,7 +92,13 @@
     const key = `${state.file}|${state.tests.length}|${!!state.problem}|${!!state.cses}|${state.browserSubmit}|${!!state.ai}`;
     if (key !== layoutKey) {
       layoutKey = key;
-      folded.clear();
+      const sameFile = state.file === lastFile;
+      // Keep tests the user opened while they add tests; start over for another file or after a delete.
+      if (!sameFile || state.tests.length < lastCount) folded.clear();
+      // A test that was just added opens, ready to type into.
+      if (sameFile && state.tests.length === lastCount + 1) folded.set(lastCount, false);
+      lastFile = state.file;
+      lastCount = state.tests.length;
       build();
     }
     // A new run resets hand-folded tests so results unfold the failures again.
@@ -162,6 +172,7 @@
       chevron: icon('chevron-down'),
       pill: h('span', { class: 'pill' }),
       time: h('span', { class: 'time muted' }),
+      peek: h('span', { class: 'peek muted' }),
       input: textarea(),
       expected: textarea(),
       received: h('div', { class: 'field' }),
@@ -181,6 +192,7 @@
       h('span', { class: 'test-name' }, [`Test ${index + 1}`]),
       card.pill,
       card.time,
+      card.peek,
       h('span', { class: 'spacer' }),
       card.whyBtn,
       card.runBtn,
@@ -198,23 +210,41 @@
       }
     });
 
-    card.root.append(
-      row,
-      h('div', { class: 'test-body' }, [
-        h('div', { class: 'field' }, [h('label', {}, ['Input']), card.input]),
-        h('div', { class: 'field' }, [h('label', {}, ['Expected']), card.expected]),
-        card.received,
-        card.explain,
-      ]),
-    );
+    const body = h('div', { class: 'test-body' }, [
+      h('div', { class: 'field' }, [h('label', {}, ['Input']), card.input]),
+      h('div', { class: 'field' }, [h('label', {}, ['Expected']), card.expected]),
+      card.received,
+      card.explain,
+    ]);
+    // Editing a test clears its result; keep it open instead of folding it under the cursor.
+    body.addEventListener('focusin', () => folded.set(index, false));
+    card.root.append(row, body);
     return card;
   }
 
-  /** Passing tests fold by default; everything else stays open unless the user folded it. @param {number} i */
+  /** Passing tests fold to one row by default; everything else stays open unless the user folded it. @param {number} i */
   function isFolded(i) {
     if (folded.has(i)) return folded.get(i);
     const r = state.results[i];
     return Boolean(r && r !== 'running' && r.verdict === 'AC');
+  }
+
+  /** Opens test `i`, scrolls it into view and flashes it, e.g. from the summary boxes. @param {number} i */
+  function showTest(i) {
+    const card = cards[i];
+    if (!card) return;
+    folded.set(i, false);
+    update();
+    card.root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    card.root.classList.remove('flash');
+    void card.root.offsetWidth; // restart the animation
+    card.root.classList.add('flash');
+  }
+
+  /** "5 · 2 3 1 5": the start of a test's input on one line, shown on folded rows. @param {string} input */
+  function peek(input) {
+    const flat = input.trim().split('\n').map((l) => l.trim()).filter(Boolean).join(' · ');
+    return flat.length > 40 ? `${flat.slice(0, 40)}…` : flat || 'empty';
   }
 
   // ---------- updates ----------
@@ -264,6 +294,8 @@
         card.received.hidden = true;
       }
       card.pill.hidden = !card.pill.textContent;
+      card.peek.textContent = peek(test.input);
+      card.peek.title = test.input;
 
       const failed = r && r !== 'running' && r.verdict !== 'AC';
       const explanation = state.ai && failed ? state.ai.explanations[i] : null;
@@ -285,26 +317,69 @@
       h('span', { class: 'summary-text' }, [text]),
       h(
         'span',
-        { class: 'dots' },
+        { class: 'boxes' },
         state.results.map((/** @type {any} */ r, /** @type {number} */ i) =>
-          h('span', { class: 'dot', 'data-verdict': r === 'running' ? 'running' : r ? r.verdict : 'none', title: `Test ${i + 1}${r && r !== 'running' ? `: ${r.verdict}` : ''}` }),
+          h(
+            'button',
+            {
+              class: 'box',
+              'data-verdict': r === 'running' ? 'running' : r ? r.verdict : 'none',
+              title: `Show test ${i + 1}${r && r !== 'running' ? ` (${r.verdict})` : ''}`,
+              onclick: () => showTest(i),
+            },
+            [String(i + 1)],
+          ),
         ),
       ),
     );
   }
 
+  /** Compile-error box parts, rebuilt only when the compiler output changes. */
+  let compileWhy = /** @type {HTMLButtonElement | null} */ (null);
+  let compileExplain = /** @type {HTMLElement | null} */ (null);
+
   function updateCompile() {
     const c = state.compile;
     header.compile.hidden = c.status !== 'compiling' && c.status !== 'error';
     if (c.status === 'compiling') {
+      if (unchanged(header.compile, 'compiling')) return;
       header.compile.className = 'notice';
       header.compile.replaceChildren(icon('loading codicon-modifier-spin'), h('span', {}, ['Compiling…']));
-    } else if (c.status === 'error') {
+      return;
+    }
+    if (c.status !== 'error') return;
+
+    if (!unchanged(header.compile, c.output)) {
       header.compile.className = 'notice error';
+      compileWhy = /** @type {HTMLButtonElement} */ (
+        h(
+          'button',
+          {
+            class: 'why',
+            title: 'Ask AI what this compiler error means (practice only)',
+            onclick: (/** @type {Event} */ e) => {
+              // The button sits in the <summary>; don't fold the box.
+              e.preventDefault();
+              e.stopPropagation();
+              post('explainCompile');
+            },
+          },
+          [icon('sparkle'), h('span', {}, ['Why?'])],
+        )
+      );
+      compileExplain = h('div', { class: 'ai-card' });
       header.compile.replaceChildren(
-        h('details', { open: '' }, [h('summary', {}, [icon('error'), h('span', {}, ['Compilation error'])]), h('pre', { class: 'io' }, [c.output])]),
+        h('details', { open: '' }, [
+          h('summary', {}, [icon('error'), h('span', {}, ['Compilation error']), h('span', { class: 'spacer' }), compileWhy]),
+          h('pre', { class: 'io' }, [c.output]),
+        ]),
+        compileExplain,
       );
     }
+    const explanation = state.ai ? state.ai.compileExplanation : null;
+    /** @type {HTMLButtonElement} */ (compileWhy).hidden = !state.ai;
+    /** @type {HTMLButtonElement} */ (compileWhy).disabled = Boolean(explanation && explanation.status === 'loading');
+    renderExplanation(/** @type {HTMLElement} */ (compileExplain), explanation);
   }
 
   function updateCses() {
@@ -363,11 +438,11 @@
     const head = (/** @type {(Node|string)[]} */ ...rest) => h('div', { class: 'card-head' }, [icon('sparkle'), h('span', { class: 'ai-label' }, ['AI']), ...rest]);
     if (x.status === 'loading') {
       box.className = 'ai-card loading';
-      return box.replaceChildren(head(h('span', { class: 'muted' }, ['Looking at this test…']), h('span', { class: 'spacer' }), icon('loading codicon-modifier-spin')));
+      return box.replaceChildren(head(h('span', { class: 'muted' }, ['Thinking…']), h('span', { class: 'spacer' }), icon('loading codicon-modifier-spin')));
     }
     if (x.status === 'error') {
       box.className = 'ai-card error';
-      return box.replaceChildren(head(h('span', { class: 'muted' }, ["Couldn't explain this test"])), h('p', {}, [x.message]));
+      return box.replaceChildren(head(h('span', { class: 'muted' }, ["Couldn't explain this"])), h('p', {}, [x.message]));
     }
     const d = x.diagnosis;
     const hint = h('p', { class: 'hint', hidden: '' }, [d.hint]);

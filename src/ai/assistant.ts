@@ -6,7 +6,17 @@ import { fetchCsesStatement } from '../cses/statement';
 import { ClaudeProvider, DEFAULT_CLAUDE_MODEL } from './claude';
 import { CopilotProvider } from './copilot';
 import { plainDiagnosis } from './plainText';
-import { DIAGNOSE_SYSTEM, DiagnoseInput, STRESS_SYSTEM, StressInput, diagnosePrompt, stressPrompt } from './prompts';
+import {
+  COMPILE_SYSTEM,
+  CompileErrorInput,
+  DIAGNOSE_SYSTEM,
+  DiagnoseInput,
+  STRESS_SYSTEM,
+  StressInput,
+  compileErrorPrompt,
+  diagnosePrompt,
+  stressPrompt,
+} from './prompts';
 import { AiError, AiProvider } from './provider';
 import { Diagnosis, StressPrograms } from './schemas';
 
@@ -35,6 +45,14 @@ export class AiAssistant {
       schema: Diagnosis,
       signal,
     });
+    return { diagnosis: plainDiagnosis(diagnosis), by: provider.label };
+  }
+
+  /** Explains a compiler error in plain words (same card shape as a failing test). */
+  async explainCompileError(problem: Problem, input: CompileErrorInput, signal?: AbortSignal): Promise<{ diagnosis: Diagnosis; by: string }> {
+    await this.ensurePractice(problem);
+    const provider = await this.provider();
+    const diagnosis = await provider.generate({ system: COMPILE_SYSTEM, prompt: compileErrorPrompt(input), schema: Diagnosis, signal });
     return { diagnosis: plainDiagnosis(diagnosis), by: provider.label };
   }
 
