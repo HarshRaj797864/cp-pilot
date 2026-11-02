@@ -4,7 +4,7 @@
 
 > **Preview release.** Things may be rough around the edges. Please [report anything odd](https://github.com/HarshRaj797864/cp-pilot/issues/new/choose); feedback shapes what comes next.
 
-<!-- Demo GIF goes here: ![CP Pilot demo](media/demo.gif) -->
+![CP Pilot: import a CSES problem, run the sample, ask AI why it fails, fix it, submit and get Accepted](media/demo.gif)
 
 ## Features
 

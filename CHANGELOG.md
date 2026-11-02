@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2 (preview)
+
+- Demo GIF in the README and on the Marketplace page.
+
 ## 0.2.1 (preview)
 
 - **✨ Why? on compile errors**: the AI explains a confusing compiler message in plain words, points at the line and gives the fix.
