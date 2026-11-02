@@ -605,3 +605,22 @@ textarea:focus {
 .empty p {
   margin: 8px 0 0;
 }
+
+/* Folded rows show the start of the input so tests can be told apart. */
+.peek {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.85em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.test:not(.folded) .peek {
+  visibility: hidden;
+}
+
+.test-row .peek + .spacer {
+  display: none;
+}
