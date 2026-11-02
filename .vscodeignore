@@ -14,3 +14,5 @@ CONTRIBUTING.md
 media/icon.svg
 .cph/**
 *.cpp
+media/demo.gif
+.cp-pilot/**

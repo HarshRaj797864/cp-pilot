@@ -2,7 +2,7 @@
   "name": "cp-pilot",
   "displayName": "CP Pilot",
   "description": "Competitive programming in VS Code: import problems from Codeforces, AtCoder, CSES, USACO and 100+ judges, run tests locally, submit, and track your CSES progress.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "preview": true,
   "publisher": "harshraj797864",
   "author": {
