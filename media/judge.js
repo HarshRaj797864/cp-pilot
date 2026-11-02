@@ -222,11 +222,23 @@
     return card;
   }
 
-  /** Tests are one-line rows until clicked; failed tests open by themselves after a run. @param {number} i */
+  /** Passing tests fold to one row by default; everything else stays open unless the user folded it. @param {number} i */
   function isFolded(i) {
     if (folded.has(i)) return folded.get(i);
     const r = state.results[i];
-    return !(r && r !== 'running' && r.verdict !== 'AC');
+    return Boolean(r && r !== 'running' && r.verdict === 'AC');
+  }
+
+  /** Opens test `i`, scrolls it into view and flashes it, e.g. from the summary boxes. @param {number} i */
+  function showTest(i) {
+    const card = cards[i];
+    if (!card) return;
+    folded.set(i, false);
+    update();
+    card.root.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    card.root.classList.remove('flash');
+    void card.root.offsetWidth; // restart the animation
+    card.root.classList.add('flash');
   }
 
   /** "5 · 2 3 1 5": the start of a test's input on one line, shown on folded rows. @param {string} input */
@@ -305,9 +317,18 @@
       h('span', { class: 'summary-text' }, [text]),
       h(
         'span',
-        { class: 'dots' },
+        { class: 'boxes' },
         state.results.map((/** @type {any} */ r, /** @type {number} */ i) =>
-          h('span', { class: 'dot', 'data-verdict': r === 'running' ? 'running' : r ? r.verdict : 'none', title: `Test ${i + 1}${r && r !== 'running' ? `: ${r.verdict}` : ''}` }),
+          h(
+            'button',
+            {
+              class: 'box',
+              'data-verdict': r === 'running' ? 'running' : r ? r.verdict : 'none',
+              title: `Show test ${i + 1}${r && r !== 'running' ? ` (${r.verdict})` : ''}`,
+              onclick: () => showTest(i),
+            },
+            [String(i + 1)],
+          ),
         ),
       ),
     );
